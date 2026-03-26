@@ -3,6 +3,7 @@ import axios from 'axios'
 import { useNavigate, Link } from 'react-router-dom'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import { API_BASE_URL } from '../config/api'
 
 export default function Signup({ setToken }) {
   const [username, setUsername] = useState('')
@@ -13,7 +14,7 @@ export default function Signup({ setToken }) {
 
   const handleSignup = async () => {
     try {
-      const res = await axios.post('http://localhost:3001/api/auth/signup', { username, email, password })
+      const res = await axios.post(`${API_BASE_URL}/api/auth/signup`, { username, email, password })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('username', res.data.username)
       setToken(res.data.token)

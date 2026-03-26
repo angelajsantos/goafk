@@ -3,6 +3,7 @@ import axios from 'axios'
 import AppLayout from '../components/layout/AppLayout'
 import Card from '../components/ui/Card'
 import { deriveSessionInsights } from '../utils/demoData'
+import { API_BASE_URL } from '../config/api'
 
 export default function Sessions({ setToken }) {
   const [sessions, setSessions] = useState([])
@@ -15,7 +16,7 @@ export default function Sessions({ setToken }) {
   }, [])
 
   const fetchSessions = async () => {
-    const res = await axios.get('http://localhost:3001/api/sessions', { headers })
+    const res = await axios.get(`${API_BASE_URL}/api/sessions`, { headers })
     setSessions(res.data.filter(session => session.endedAt))
   }
 

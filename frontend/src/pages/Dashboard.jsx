@@ -3,6 +3,7 @@ import axios from 'axios'
 import AppLayout from '../components/layout/AppLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import { API_BASE_URL } from '../config/api'
 
 export default function Dashboard({ setToken, settings }) {
   const [sessions, setSessions] = useState([])
@@ -99,7 +100,7 @@ export default function Dashboard({ setToken, settings }) {
   }, [breakMode, breakTimeLeft])
 
   const fetchSessions = async () => {
-    const res = await axios.get('http://localhost:3001/api/sessions', { headers })
+    const res = await axios.get(`${API_BASE_URL}/api/sessions`, { headers })
     setSessions(res.data)
     const active = res.data.find(s => !s.endedAt)
     setActiveSession(active || null)
@@ -113,7 +114,7 @@ export default function Dashboard({ setToken, settings }) {
     resetBreakState()
     setElapsed(0)
     const res = await axios.post(
-      'http://localhost:3001/api/sessions/start',
+      `${API_BASE_URL}/api/sessions/start`,
       { gameName: gameName || 'Gaming Session' },
       { headers }
     )
@@ -123,7 +124,7 @@ export default function Dashboard({ setToken, settings }) {
 
   const stopSession = async () => {
     const pausedSeconds = getEffectivePausedSeconds()
-    await axios.put(`http://localhost:3001/api/sessions/stop/${activeSession._id}`, { pausedSeconds }, { headers })
+    await axios.put(`${API_BASE_URL}/api/sessions/stop/${activeSession._id}`, { pausedSeconds }, { headers })
     setActiveSession(null)
     setElapsed(0)
     resetBreakState()
