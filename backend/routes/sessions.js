@@ -31,8 +31,15 @@ router.post('/start', auth, async (req, res) => {
 router.put('/stop/:id', auth, async (req, res) => {
     try {
         const session = await Session.findById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        if (session.userId.toString() !== req.userId) return res.status(403).json({ error: 'Forbidden' });
+
         session.endedAt = new Date();
-        session.durationMinutes = Math.round((session.endedAt - session.startedAt) / 60000);
+        const wallClockSeconds = Math.floor((session.endedAt - session.startedAt) / 1000);
+        const pausedSeconds = Math.max(0, Number(req.body?.pausedSeconds) || 0);
+        const totalSeconds = Math.max(0, wallClockSeconds - pausedSeconds);
+        session.durationSeconds = totalSeconds;
+        session.durationMinutes = Math.floor(totalSeconds / 60);
         await session.save();
         res.json(session);
     } catch (err) {

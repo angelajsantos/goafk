@@ -5,6 +5,7 @@ const sessionSchema = new mongoose.Schema({
     startedAt: { type: Date, default: Date.now },
     endedAt: { type: Date },
     durationMinutes: { type: Number },
+    durationSeconds: { type: Number },
     gameName: { type: String, default: 'Gaming Session' },
 }, { timestamps: true });
 
