@@ -1,8 +1,10 @@
+import { NavLink } from 'react-router-dom'
+
 const NAV_ITEMS = [
-  { id: 'games', label: 'Games' },
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'stats', label: 'Stats' },
-  { id: 'settings', label: 'Settings' },
+  { id: 'dashboard', label: 'Dashboard', to: '/dashboard' },
+  { id: 'games', label: 'Games', to: '/games' },
+  { id: 'sessions', label: 'Sessions', to: '/sessions' },
+  { id: 'settings', label: 'Settings', to: '/settings' },
 ]
 
 export default function Sidebar({ username }) {
@@ -15,13 +17,13 @@ export default function Sidebar({ username }) {
 
       <nav className="sidebar__nav">
         {NAV_ITEMS.map(item => (
-          <button
+          <NavLink
             key={item.id}
-            type="button"
-            className={`sidebar__link ${item.id === 'sessions' ? 'sidebar__link--active' : ''}`}
+            to={item.to}
+            className={({ isActive }) => `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`}
           >
             {item.label}
-          </button>
+          </NavLink>
         ))}
       </nav>
 

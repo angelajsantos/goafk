@@ -1,17 +1,14 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { useNavigate } from 'react-router-dom'
-import Sidebar from '../components/layout/Sidebar'
+import AppLayout from '../components/layout/AppLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 
-export default function Dashboard({ setToken }) {
-  const BREAK_REMINDER_INTERVAL_SECONDS = 10
-
+export default function Dashboard({ setToken, settings }) {
   const [sessions, setSessions] = useState([])
   const [activeSession, setActiveSession] = useState(null)
   const [gameName, setGameName] = useState('')
-  const [dailyLimit, setDailyLimit] = useState(120)
+  const [dailyLimit, setDailyLimit] = useState(settings.dailyPlaytimeLimit)
   const [elapsed, setElapsed] = useState(0)
   const [showBreakReminder, setShowBreakReminder] = useState(false)
   const [breakMode, setBreakMode] = useState(null)
@@ -19,16 +16,21 @@ export default function Dashboard({ setToken }) {
   const [sessionPaused, setSessionPaused] = useState(false)
   const [pausedAt, setPausedAt] = useState(null)
   const [totalPausedSeconds, setTotalPausedSeconds] = useState(0)
-  const [nextBreakReminderAt, setNextBreakReminderAt] = useState(BREAK_REMINDER_INTERVAL_SECONDS)
+  const breakReminderIntervalSeconds = settings.breakReminderIntervalMinutes * 60
+  const [nextBreakReminderAt, setNextBreakReminderAt] = useState(breakReminderIntervalSeconds)
 
   const token = localStorage.getItem('token')
   const username = localStorage.getItem('username')
-  const navigate = useNavigate()
   const headers = { Authorization: `Bearer ${token}` }
 
   useEffect(() => {
     fetchSessions()
   }, [])
+
+  useEffect(() => {
+    setDailyLimit(settings.dailyPlaytimeLimit)
+    setNextBreakReminderAt(current => (current < breakReminderIntervalSeconds ? breakReminderIntervalSeconds : current))
+  }, [settings.dailyPlaytimeLimit, breakReminderIntervalSeconds])
 
   const resetBreakState = () => {
     setShowBreakReminder(false)
@@ -37,7 +39,7 @@ export default function Dashboard({ setToken }) {
     setSessionPaused(false)
     setPausedAt(null)
     setTotalPausedSeconds(0)
-    setNextBreakReminderAt(BREAK_REMINDER_INTERVAL_SECONDS)
+    setNextBreakReminderAt(breakReminderIntervalSeconds)
   }
 
   const pauseForBreak = (mode, durationSeconds = 0) => {
@@ -70,7 +72,7 @@ export default function Dashboard({ setToken }) {
     setShowBreakReminder(false)
     setBreakMode(null)
     setBreakTimeLeft(0)
-    setNextBreakReminderAt(resumeElapsed + BREAK_REMINDER_INTERVAL_SECONDS)
+    setNextBreakReminderAt(resumeElapsed + breakReminderIntervalSeconds)
   }
 
   useEffect(() => {
@@ -128,12 +130,6 @@ export default function Dashboard({ setToken }) {
     fetchSessions()
   }
 
-  const logout = () => {
-    localStorage.clear()
-    setToken(null)
-    navigate('/login')
-  }
-
   const formatTime = secs => {
     const h = Math.floor(secs / 3600)
     const m = Math.floor((secs % 3600) / 60)
@@ -174,7 +170,7 @@ export default function Dashboard({ setToken }) {
                   onClick={() => {
                     setShowBreakReminder(false)
                     setBreakMode(null)
-                    setNextBreakReminderAt(elapsed + BREAK_REMINDER_INTERVAL_SECONDS)
+                    setNextBreakReminderAt(elapsed + breakReminderIntervalSeconds)
                   }}
                 >
                   No, keep playing
@@ -238,23 +234,23 @@ export default function Dashboard({ setToken }) {
         </div>
       )}
 
-      <div className="app-shell">
-        <Sidebar username={username} />
-
-        <main className="dashboard-main">
-          <header className="topbar">
-            <div className="topbar__title">
-              <h2>Dashboard</h2>
-              <p>Track your sessions in a calm and healthy rhythm.</p>
-            </div>
-            <Button variant="ghost" onClick={logout}>
-              Logout
-            </Button>
-          </header>
-
+      <AppLayout
+        title="Dashboard"
+        subtitle="Track your sessions in a calm and healthy rhythm."
+        username={username}
+        setToken={setToken}
+      >
           <section className="dashboard-grid">
             <div className="span-12">
-              <Card className="ui-card--hero" title="Current Session" subtitle={activeSession ? `Now playing: ${activeSession.gameName}` : 'Ready to begin?'}>
+              <Card
+                className="ui-card--hero"
+                title="Current Session"
+                subtitle={
+                  activeSession
+                    ? `Now playing: ${activeSession.gameName}`
+                    : `Ready to begin? Break reminders every ${settings.breakReminderIntervalMinutes} minutes.`
+                }
+              >
                 {activeSession ? (
                   <div className="stack">
                     <p className={`session-time ${sessionPaused ? 'session-time--paused' : ''}`}>{formatTime(elapsed)}</p>
@@ -314,7 +310,7 @@ export default function Dashboard({ setToken }) {
                       className="input"
                       type="number"
                       value={dailyLimit}
-                      onChange={e => setDailyLimit(Number(e.target.value))}
+                      onChange={e => setDailyLimit(Number(e.target.value) || 0)}
                     />
                   </label>
                 </div>
@@ -340,8 +336,7 @@ export default function Dashboard({ setToken }) {
               </Card>
             </div>
           </section>
-        </main>
-      </div>
+      </AppLayout>
     </>
   )
 }
