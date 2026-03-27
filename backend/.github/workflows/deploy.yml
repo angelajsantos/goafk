@@ -1,0 +1,44 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Check backend syntax
+        working-directory: backend
+        run: node --check index.js
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Deployment info
+        run: echo "Checks passed. Render deploys automatically from GitHub."
