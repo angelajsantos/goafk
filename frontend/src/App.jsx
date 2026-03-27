@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import { useState } from 'react'
 import Games from './pages/Games'
 import Sessions from './pages/Sessions'
+import Statistics from './pages/Statistics'
 import Settings from './pages/Settings'
 import { loadGames, loadSettings, saveGames, saveSettings } from './utils/demoData'
 
@@ -31,7 +32,7 @@ function App() {
         <Route path="/signup" element={<Signup setToken={setToken} />} />
         <Route
           path="/dashboard"
-          element={token ? <Dashboard setToken={setToken} settings={settings} /> : <Navigate to="/login" />}
+          element={token ? <Dashboard setToken={setToken} settings={settings} setSettings={updateSettings} /> : <Navigate to="/login" />}
         />
         <Route
           path="/games"
@@ -40,6 +41,10 @@ function App() {
         <Route
           path="/sessions"
           element={token ? <Sessions setToken={setToken} settings={settings} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/statistics"
+          element={token ? <Statistics setToken={setToken} settings={settings} /> : <Navigate to="/login" />}
         />
         <Route
           path="/settings"

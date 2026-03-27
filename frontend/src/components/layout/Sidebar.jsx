@@ -4,6 +4,7 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', to: '/dashboard' },
   { id: 'games', label: 'Games', to: '/games' },
   { id: 'sessions', label: 'Sessions', to: '/sessions' },
+  { id: 'statistics', label: 'Statistics', to: '/statistics' },
   { id: 'settings', label: 'Settings', to: '/settings' },
 ]
 
