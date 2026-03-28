@@ -1,11 +1,20 @@
 import AppLayout from '../components/layout/AppLayout'
 import Card from '../components/ui/Card'
+import { applyReminderPreset, REMINDER_PRESETS, syncReminderSettings } from '../utils/reminderPresets'
 
 export default function Settings({ setToken, settings, setSettings }) {
   const username = localStorage.getItem('username')
 
   const updateSetting = (key, value) => {
-    setSettings({ ...settings, [key]: value })
+    const nextSettings = syncReminderSettings(
+      {
+        [key]: value,
+        reminderPreset: key === 'reminderPreset' ? value : 'custom',
+      },
+      settings
+    )
+
+    setSettings(key === 'reminderPreset' ? applyReminderPreset(value, settings) : nextSettings)
   }
 
   return (
@@ -20,6 +29,21 @@ export default function Settings({ setToken, settings, setSettings }) {
           <Card title="Reminder Preferences" subtitle="Demo-ready settings stored on the frontend">
             <div className="settings-grid">
               <label className="field">
+                <span className="field__label">Preset</span>
+                <select
+                  className="input input--select"
+                  value={settings.reminderPreset || 'balanced'}
+                  onChange={e => updateSetting('reminderPreset', e.target.value)}
+                >
+                  {Object.entries(REMINDER_PRESETS).map(([key, preset]) => (
+                    <option key={key} value={key}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
                 <span className="field__label">Break reminder interval (minutes)</span>
                 <input
                   className="input"
@@ -32,7 +56,7 @@ export default function Settings({ setToken, settings, setSettings }) {
               <label className="field">
                 <span className="field__label">Preferred break duration (minutes)</span>
                 <select
-                  className="input"
+                  className="input input--select"
                   value={settings.preferredBreakDuration}
                   onChange={e => updateSetting('preferredBreakDuration', Number(e.target.value))}
                 >
@@ -57,11 +81,12 @@ export default function Settings({ setToken, settings, setSettings }) {
               <label className="field">
                 <span className="field__label">Reminder style</span>
                 <select
-                  className="input"
-                  value={settings.gentleReminderMode ? 'gentle' : 'focus'}
-                  onChange={e => updateSetting('gentleReminderMode', e.target.value === 'gentle')}
+                  className="input input--select"
+                  value={settings.reminderMode || (settings.gentleReminderMode ? 'gentle' : 'focus')}
+                  onChange={e => updateSetting('reminderMode', e.target.value)}
                 >
                   <option value="gentle">Gentle reminder mode</option>
+                  <option value="balanced">Balanced mode</option>
                   <option value="focus">Focus mode</option>
                 </select>
               </label>
