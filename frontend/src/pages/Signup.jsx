@@ -4,83 +4,40 @@ import { useNavigate, Link } from 'react-router-dom'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { API_BASE_URL } from '../config/api'
-import { validateSignupForm } from '../utils/authValidation'
-
-const wait = (milliseconds) => new Promise((resolve) => {
-  window.setTimeout(resolve, milliseconds)
-})
 
 export default function Signup({ setToken }) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [status, setStatus] = useState({ type: '', message: '' })
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  const handleSignup = async (event) => {
-    event.preventDefault()
-
-    const validationMessage = validateSignupForm({ username, email, password })
-    if (validationMessage) {
-      setStatus({ type: 'error', message: validationMessage })
-      return
-    }
-
+  const handleSignup = async () => {
     try {
-      setIsSubmitting(true)
-      setStatus({ type: 'info', message: 'Creating account, please wait...' })
-
-      const res = await axios.post(`${API_BASE_URL}/api/auth/signup`, {
-        username: username.trim(),
-        email: email.trim(),
-        password,
-      })
-
+      const res = await axios.post(`${API_BASE_URL}/api/auth/signup`, { username, email, password })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('username', res.data.username)
-      setStatus({ type: 'success', message: res.data.message || 'Account created successfully.' })
-      await wait(900)
       setToken(res.data.token)
       navigate('/dashboard')
-    } catch (error) {
-      setStatus({ type: 'error', message: error.response?.data?.error || 'Signup failed. Please try again.' })
-    } finally {
-      setIsSubmitting(false)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Signup failed')
     }
   }
 
   return (
     <div className="auth-page">
       <Card className="auth-card" title="Create account" subtitle="Start balancing game time and breaks with a calmer routine.">
-        <form className="stack" onSubmit={handleSignup}>
-          {status.message ? (
-            <p className={`notice notice--${status.type || 'info'}`} aria-live="polite">
-              {status.message}
-            </p>
-          ) : null}
+        <div className="stack">
+          {error && <p className="error-text">{error}</p>}
 
           <label className="field">
             <span className="field__label">Username</span>
-            <input
-              className="input"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="Your name"
-              autoComplete="username"
-            />
+            <input className="input" value={username} onChange={e => setUsername(e.target.value)} placeholder="Your name" />
           </label>
 
           <label className="field">
             <span className="field__label">Email</span>
-            <input
-              className="input"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
+            <input className="input" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
           </label>
 
           <label className="field">
@@ -89,22 +46,19 @@ export default function Signup({ setToken }) {
               className="input"
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={e => setPassword(e.target.value)}
               placeholder="Create password"
-              autoComplete="new-password"
             />
           </label>
 
-          <p className="helper-text">Use a valid email and a password with at least 6 characters.</p>
-
-          <Button variant="primary" size="lg" block type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating account...' : 'Sign up'}
+          <Button variant="primary" size="lg" block onClick={handleSignup}>
+            Sign up
           </Button>
 
           <p className="auth-link">
             Already have an account? <Link to="/login">Login</Link>
           </p>
-        </form>
+        </div>
       </Card>
     </div>
   )
