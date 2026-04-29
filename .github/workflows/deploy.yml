@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  ci-cd:
     runs-on: ubuntu-latest
 
     steps:
@@ -42,3 +42,9 @@ jobs:
 
       - name: Deployment info
         run: echo "Checks passed. Render deploys automatically from GitHub."
+
+      - name: Trigger backend deploy on Render
+        run: curl -X POST "${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}"
+
+      - name: Trigger frontend deploy on Render
+        run: curl -X POST "${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}"
