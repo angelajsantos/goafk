@@ -39,6 +39,7 @@ export default function Signup({ setToken }) {
 
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('username', res.data.username)
+      localStorage.setItem('email', email.trim())
       setStatus({ type: 'success', message: res.data.message || 'Account created successfully.' })
       await wait(900)
       setToken(res.data.token)

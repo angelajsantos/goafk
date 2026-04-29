@@ -22,6 +22,19 @@ export function formatDuration(totalSeconds = 0) {
   return `${seconds}s`
 }
 
+export function formatTimerClock(totalSeconds = 0) {
+  const safeSeconds = Math.max(0, Number(totalSeconds) || 0)
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const seconds = safeSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 export function formatDateTime(value) {
   if (!value) return 'Not recorded'
   return new Date(value).toLocaleString()

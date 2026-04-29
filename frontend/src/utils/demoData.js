@@ -1,4 +1,5 @@
 export const defaultSettings = {
+  appearanceMode: 'dark',
   breakReminderIntervalMinutes: 30,
   dailyPlaytimeLimit: 120,
   reminderSound: true,

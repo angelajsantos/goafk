@@ -24,6 +24,11 @@ const toDate = (value, fallback = new Date()) => {
     return Number.isNaN(candidate.getTime()) ? fallback : candidate;
 };
 
+const sanitizeGameName = (value) => {
+    const nextValue = String(value || '').trim();
+    return nextValue.slice(0, 80) || 'Gaming Session';
+};
+
 const getSessionSummary = (session) => {
     const reminders = Array.isArray(session.breakReminders) ? session.breakReminders : [];
     const breaksTaken = reminders.filter((entry) => entry.action === 'taken').length;
@@ -289,9 +294,27 @@ router.post('/start', auth, async (req, res) => {
 
         const session = new Session({
             userId: req.userId,
-            gameName: req.body.gameName || 'Gaming Session',
+            gameName: sanitizeGameName(req.body.gameName),
             startedAt: toDate(req.body.startTime || req.body.startedAt),
         });
+
+        applySummaryFields(session);
+        await session.save();
+        res.json(session);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+router.put('/:id', auth, async (req, res) => {
+    try {
+        const session = await Session.findById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        if (session.userId.toString() !== req.userId) return res.status(403).json({ error: 'Forbidden' });
+
+        if (typeof req.body.gameName === 'string') {
+            session.gameName = sanitizeGameName(req.body.gameName);
+        }
 
         applySummaryFields(session);
         await session.save();
