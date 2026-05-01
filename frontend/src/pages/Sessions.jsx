@@ -6,7 +6,7 @@ import Button from '../components/ui/Button'
 import { API_BASE_URL } from '../config/api'
 import { formatDateTime, formatDuration, getEndingReasonLabel } from '../utils/sessionPresentation'
 
-export default function Sessions({ setToken }) {
+export default function Sessions({ setToken, appearanceMode, onToggleAppearance }) {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -82,6 +82,8 @@ export default function Sessions({ setToken }) {
       subtitle="Detailed session history with actual reminder and break behavior."
       username={username}
       setToken={setToken}
+      appearanceMode={appearanceMode}
+      onToggleAppearance={onToggleAppearance}
     >
       <section className="dashboard-grid">
         <div className="span-12">

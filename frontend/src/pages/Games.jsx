@@ -3,7 +3,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { mockSteamLibrary } from '../utils/demoData'
 
-export default function Games({ setToken, games, setGames }) {
+export default function Games({ setToken, games, setGames, appearanceMode, onToggleAppearance }) {
   const username = localStorage.getItem('username')
 
   const importFromSteam = () => {
@@ -16,6 +16,8 @@ export default function Games({ setToken, games, setGames }) {
       subtitle="A mock Steam library to demo where your imported collection can live."
       username={username}
       setToken={setToken}
+      appearanceMode={appearanceMode}
+      onToggleAppearance={onToggleAppearance}
       actions={
         <Button variant="primary" onClick={importFromSteam}>
           Import from Steam

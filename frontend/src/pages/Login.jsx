@@ -37,7 +37,7 @@ export default function Login({ setToken }) {
 
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('username', res.data.username)
-      localStorage.setItem('email', email.trim())
+      localStorage.setItem('email', res.data.email || email.trim())
       setStatus({ type: 'success', message: res.data.message || 'Signed in successfully.' })
       await wait(700)
       setToken(res.data.token)

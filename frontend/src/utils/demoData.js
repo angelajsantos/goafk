@@ -7,7 +7,7 @@ export const defaultSettings = {
   darkCozyTheme: true,
   sessionAutoPauseReminder: true,
   preferredBreakDuration: 5,
-  reminderPreset: 'balanced',
+  reminderPreset: 'support',
   reminderMode: 'balanced',
   gentleReminderMode: true,
   focusMode: false,

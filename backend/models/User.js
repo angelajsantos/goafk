@@ -21,6 +21,15 @@ const userSchema = new mongoose.Schema({
         match: [EMAIL_PATTERN, 'Enter a valid email address.'],
     },
     password: { type: String, required: true },
+    emailPreferences: {
+        weeklySummary: { type: Boolean, default: true },
+        breakInsights: { type: Boolean, default: true },
+        productUpdates: { type: Boolean, default: false },
+    },
+    securityPreferences: {
+        loginAlerts: { type: Boolean, default: true },
+        sessionWarnings: { type: Boolean, default: true },
+    },
 }, { timestamps: true });
 
 userSchema.pre('validate', function setUsernameKey(next) {

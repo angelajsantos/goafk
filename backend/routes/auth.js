@@ -10,6 +10,19 @@ const normalizeUsername = (value = '') => value.trim().toLowerCase()
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const normalizeEmail = (value = '') => value.trim().toLowerCase();
+const auth = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token' });
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.userId = decoded.userId;
+        next();
+    } catch {
+        res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
 const isValidEmail = (email = '') => {
     if (!EMAIL_PATTERN.test(email)) {
         return false;
@@ -65,6 +78,21 @@ const mapAuthError = (error) => {
     return error?.message || 'Something went wrong. Please try again.';
 };
 
+const getUserPayload = (user) => ({
+    userId: user._id,
+    username: user.username,
+    email: user.email,
+    emailPreferences: {
+        weeklySummary: user.emailPreferences?.weeklySummary ?? true,
+        breakInsights: user.emailPreferences?.breakInsights ?? true,
+        productUpdates: user.emailPreferences?.productUpdates ?? false,
+    },
+    securityPreferences: {
+        loginAlerts: user.securityPreferences?.loginAlerts ?? true,
+        sessionWarnings: user.securityPreferences?.sessionWarnings ?? true,
+    },
+});
+
 router.post('/signup', async (req, res) => {
     try {
         const username = req.body.username?.trim() || '';
@@ -105,8 +133,7 @@ router.post('/signup', async (req, res) => {
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
         res.json({
             token,
-            userId: user._id,
-            username: user.username,
+            ...getUserPayload(user),
             message: 'Account created successfully.',
         });
     } catch (error) {
@@ -136,9 +163,134 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
         res.json({
             token,
-            userId: user._id,
-            username: user.username,
+            ...getUserPayload(user),
             message: 'Signed in successfully.',
+        });
+    } catch (error) {
+        res.status(400).json({ error: mapAuthError(error) });
+    }
+});
+
+router.get('/me', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        res.json(getUserPayload(user));
+    } catch (error) {
+        res.status(400).json({ error: mapAuthError(error) });
+    }
+});
+
+router.put('/profile', auth, async (req, res) => {
+    try {
+        const username = req.body.username?.trim() || '';
+        if (!username) {
+            return res.status(400).json({ error: 'Please enter a display name.' });
+        }
+
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        const existingUsernameUser = await User.findOne({
+            _id: { $ne: req.userId },
+            username: {
+                $regex: `^${escapeRegex(username)}$`,
+                $options: 'i',
+            },
+        });
+
+        if (existingUsernameUser) {
+            return res.status(400).json({ error: 'That username is already taken.' });
+        }
+
+        user.username = username;
+        await user.save();
+
+        res.json({
+            ...getUserPayload(user),
+            message: 'Profile updated.',
+        });
+    } catch (error) {
+        res.status(400).json({ error: mapAuthError(error) });
+    }
+});
+
+router.put('/password', auth, async (req, res) => {
+    try {
+        const currentPassword = req.body.currentPassword || '';
+        const nextPassword = req.body.newPassword || '';
+
+        if (!currentPassword.trim() || !nextPassword.trim()) {
+            return res.status(400).json({ error: 'Please enter both your current and new password.' });
+        }
+
+        if (nextPassword.trim().length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+        }
+
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Current password is incorrect.' });
+        }
+
+        user.password = await bcrypt.hash(nextPassword, 10);
+        await user.save();
+
+        res.json({ message: 'Password updated successfully.' });
+    } catch (error) {
+        res.status(400).json({ error: mapAuthError(error) });
+    }
+});
+
+router.put('/preferences/email', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        user.emailPreferences = {
+            weeklySummary: Boolean(req.body.weeklySummary),
+            breakInsights: Boolean(req.body.breakInsights),
+            productUpdates: Boolean(req.body.productUpdates),
+        };
+
+        await user.save();
+        res.json({
+            emailPreferences: getUserPayload(user).emailPreferences,
+            message: 'Email preferences saved.',
+        });
+    } catch (error) {
+        res.status(400).json({ error: mapAuthError(error) });
+    }
+});
+
+router.put('/preferences/security', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        user.securityPreferences = {
+            loginAlerts: Boolean(req.body.loginAlerts),
+            sessionWarnings: Boolean(req.body.sessionWarnings),
+        };
+
+        await user.save();
+        res.json({
+            securityPreferences: getUserPayload(user).securityPreferences,
+            message: 'Security preferences saved.',
         });
     } catch (error) {
         res.status(400).json({ error: mapAuthError(error) });

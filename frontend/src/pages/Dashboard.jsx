@@ -6,11 +6,11 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { API_BASE_URL } from '../config/api'
 import { formatDuration, formatShortDate, formatTimerClock } from '../utils/sessionPresentation'
-import { applyReminderPreset, REMINDER_PRESETS, syncReminderSettings } from '../utils/reminderPresets'
+import { applyReminderPreset, REMINDER_PRESETS, resolveReminderPresetKey, syncReminderSettings } from '../utils/reminderPresets'
 
 const INACTIVE_TIMEOUT_SECONDS = 5 * 60
 
-export default function Dashboard({ setToken, settings, setSettings }) {
+export default function Dashboard({ setToken, settings, setSettings, onToggleAppearance }) {
   const [sessions, setSessions] = useState([])
   const [activeSession, setActiveSession] = useState(null)
   const [gameName, setGameName] = useState('')
@@ -432,7 +432,7 @@ export default function Dashboard({ setToken, settings, setSettings }) {
   const nextReminderSeconds = Math.max(0, nextBreakReminderAt - elapsed)
   const nextReminderProgress = activeSession ? Math.min((nextReminderSeconds / breakReminderIntervalSeconds) * 100, 100) : 100
   const nextBreakRingValue = activeSession ? Math.max(0, 100 - nextReminderProgress) : 0
-  const activePreset = settings.reminderPreset || 'balanced'
+  const activePreset = resolveReminderPresetKey(settings.reminderPreset)
   const activePresetDescription = REMINDER_PRESETS[activePreset]?.description || REMINDER_PRESETS.custom.description
   const activePresetLabel = REMINDER_PRESETS[activePreset]?.label || 'Custom'
   const elapsedBreakSeconds = activeBreakStartedAt
@@ -560,6 +560,8 @@ export default function Dashboard({ setToken, settings, setSettings }) {
         subtitle="Track your sessions in a calm and healthy rhythm."
         username={username}
         setToken={setToken}
+        appearanceMode={settings.appearanceMode}
+        onToggleAppearance={onToggleAppearance}
       >
         <section className="dashboard-grid">
           <div className="span-12">
@@ -623,26 +625,28 @@ export default function Dashboard({ setToken, settings, setSettings }) {
                           </p>
                         </div>
 
-                        <div className="status-row status-row--compact">
-                          <span className="badge badge--micro">Taken {activeSession.breaksTaken || 0}</span>
-                          <span className="badge badge--micro">Skipped {activeSession.breaksSkipped || 0}</span>
-                          <span className="badge badge--micro badge--subtle">{activePresetLabel}</span>
-                          {pauseReason === 'manual' ? <span className="badge badge--micro badge--warm">Paused</span> : null}
-                        </div>
+                        <div className="session-focus__footer">
+                          <div className="status-row status-row--compact">
+                            <span className="badge badge--micro">Taken {activeSession.breaksTaken || 0}</span>
+                            <span className="badge badge--micro">Skipped {activeSession.breaksSkipped || 0}</span>
+                            <span className="badge badge--micro badge--subtle">{activePresetLabel}</span>
+                            {pauseReason === 'manual' ? <span className="badge badge--micro badge--warm">Paused</span> : null}
+                          </div>
 
-                        <div className="hero-actions hero-actions--compact">
-                          {pauseReason === 'manual' ? (
-                            <Button variant="primary" size="lg" onClick={resumeSession}>
-                              Resume
+                          <div className="hero-actions hero-actions--compact">
+                            {pauseReason === 'manual' ? (
+                              <Button variant="primary" size="lg" onClick={resumeSession}>
+                                Resume
+                              </Button>
+                            ) : (
+                              <Button variant="secondary" size="lg" onClick={pauseSession} disabled={showBreakReminder || breakMode === 'countdown'}>
+                                Pause
+                              </Button>
+                            )}
+                            <Button variant="danger" size="lg" onClick={() => stopSession('manual_end')} disabled={isStopping}>
+                              Stop
                             </Button>
-                          ) : (
-                            <Button variant="secondary" size="lg" onClick={pauseSession} disabled={showBreakReminder || breakMode === 'countdown'}>
-                              Pause
-                            </Button>
-                          )}
-                          <Button variant="danger" size="lg" onClick={() => stopSession('manual_end')} disabled={isStopping}>
-                            Stop
-                          </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -672,7 +676,7 @@ export default function Dashboard({ setToken, settings, setSettings }) {
                 <div className={`break-ring break-ring--hero ${!activeSession ? 'break-ring--idle' : ''}`}>
                   <CircularProgressbar
                     value={activeSession ? nextBreakRingValue : 0}
-                    strokeWidth={9}
+                    strokeWidth={10.5}
                     styles={buildStyles({
                       pathColor: nextReminderSeconds <= 300 ? '#dfbc90' : '#8db49f',
                       trailColor: 'rgba(79, 103, 97, 0.24)',
@@ -697,12 +701,13 @@ export default function Dashboard({ setToken, settings, setSettings }) {
                           onClick={() => applyPreset(key)}
                         >
                           <strong>{preset.label}</strong>
+                          <span className="preset-chip__subtitle">{preset.subtitle || 'Your Rules'}</span>
                           {preset.intervalMinutes ? (
-                            <span>
+                            <span className="preset-chip__meta">
                               {preset.intervalMinutes}m / {preset.breakDurationMinutes}m
                             </span>
                           ) : (
-                            <span>Manual tune</span>
+                            <span className="preset-chip__meta">User-defined timing</span>
                           )}
                         </button>
                       ))}

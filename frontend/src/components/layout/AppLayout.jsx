@@ -2,7 +2,16 @@ import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Button from '../ui/Button'
 
-export default function AppLayout({ title, subtitle, username, setToken, actions, children }) {
+export default function AppLayout({
+  title,
+  subtitle,
+  username,
+  setToken,
+  actions,
+  children,
+  appearanceMode = 'dark',
+  onToggleAppearance,
+}) {
   const navigate = useNavigate()
 
   const logout = () => {
@@ -22,6 +31,19 @@ export default function AppLayout({ title, subtitle, username, setToken, actions
             <p>{subtitle}</p>
           </div>
           <div className="topbar__actions">
+            {onToggleAppearance ? (
+              <button
+                type="button"
+                className="theme-toggle"
+                onClick={onToggleAppearance}
+                aria-label={`Switch to ${appearanceMode === 'light' ? 'dark' : 'light'} mode`}
+                title={`Switch to ${appearanceMode === 'light' ? 'dark' : 'light'} mode`}
+              >
+                <span className="theme-toggle__icon" aria-hidden="true">
+                  {appearanceMode === 'light' ? '\u2600' : '\u263E'}
+                </span>
+              </button>
+            ) : null}
             {actions}
             <Button variant="ghost" onClick={logout}>
               Logout

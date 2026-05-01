@@ -5,7 +5,7 @@ import Card from '../components/ui/Card'
 import { API_BASE_URL } from '../config/api'
 import { formatDuration, getEndingReasonLabel } from '../utils/sessionPresentation'
 
-export default function Statistics({ setToken, settings }) {
+export default function Statistics({ setToken, settings, appearanceMode, onToggleAppearance }) {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -46,6 +46,8 @@ export default function Statistics({ setToken, settings }) {
       subtitle="Longer-term patterns for healthier play and steadier breaks."
       username={username}
       setToken={setToken}
+      appearanceMode={appearanceMode}
+      onToggleAppearance={onToggleAppearance}
     >
       <section className="dashboard-grid">
         <div className="span-12">
