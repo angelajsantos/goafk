@@ -93,6 +93,15 @@ const getUserPayload = (user) => ({
     },
 });
 
+router.get('/public-stats', async (req, res) => {
+    try {
+        const userCount = await User.countDocuments();
+        res.json({ userCount });
+    } catch (error) {
+        res.status(400).json({ error: mapAuthError(error) });
+    }
+});
+
 router.post('/signup', async (req, res) => {
     try {
         const username = req.body.username?.trim() || '';
@@ -129,11 +138,13 @@ router.post('/signup', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = new User({ username, usernameKey, email, password: hashedPassword });
         await user.save();
+        const userCount = await User.countDocuments();
 
         const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
         res.json({
             token,
             ...getUserPayload(user),
+            userCount,
             message: 'Account created successfully.',
         });
     } catch (error) {

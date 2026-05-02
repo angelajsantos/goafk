@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useNavigate, Link } from 'react-router-dom'
 import Button from '../components/ui/Button'
@@ -16,7 +16,21 @@ export default function Signup({ setToken }) {
   const [password, setPassword] = useState('')
   const [status, setStatus] = useState({ type: '', message: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [userCount, setUserCount] = useState(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const fetchPublicStats = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/auth/public-stats`)
+        setUserCount(Number(res.data.userCount) || 0)
+      } catch {
+        setUserCount(null)
+      }
+    }
+
+    fetchPublicStats()
+  }, [])
 
   const handleSignup = async (event) => {
     event.preventDefault()
@@ -40,6 +54,14 @@ export default function Signup({ setToken }) {
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('username', res.data.username)
       localStorage.setItem('email', res.data.email || email.trim())
+      if (Number.isFinite(Number(res.data.userCount))) {
+        setUserCount(Number(res.data.userCount))
+      }
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', 'sign_up', {
+          method: 'email',
+        })
+      }
       setStatus({ type: 'success', message: res.data.message || 'Account created successfully.' })
       await wait(900)
       setToken(res.data.token)
@@ -97,6 +119,9 @@ export default function Signup({ setToken }) {
           </label>
 
           <p className="helper-text">Use a valid email and a password with at least 6 characters.</p>
+          {userCount !== null ? (
+            <p className="helper-text">Join {userCount.toLocaleString()} player{userCount === 1 ? '' : 's'} already tracking calmer sessions.</p>
+          ) : null}
 
           <Button variant="primary" size="lg" block type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account...' : 'Sign up'}
