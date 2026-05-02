@@ -32,9 +32,8 @@ const userSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
-userSchema.pre('validate', function setUsernameKey(next) {
+userSchema.pre('validate', function setUsernameKey() {
     this.usernameKey = normalizeUsername(this.username);
-    next();
 });
 
 module.exports = mongoose.model('User', userSchema);
