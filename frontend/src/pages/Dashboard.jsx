@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar'
 import AppLayout from '../components/layout/AppLayout'
@@ -6,7 +6,18 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { API_BASE_URL } from '../config/api'
 import { formatDuration, formatShortDate, formatTimerClock } from '../utils/sessionPresentation'
-import { applyReminderPreset, REMINDER_PRESETS, resolveReminderPresetKey, syncReminderSettings } from '../utils/reminderPresets'
+import { REMINDER_PRESETS, resolveReminderPresetKey } from '../utils/reminderPresets'
+import {
+  WELLNESS_INTENSITIES,
+  WELLNESS_REMINDER_TYPES,
+  createWellnessSchedule,
+  createWellnessScheduleFromSession,
+  getNextWellnessReminder,
+  getWellnessCounts,
+  getWellnessIntervalSeconds,
+  getWellnessSnoozeSeconds,
+  normalizeWellnessPreferences,
+} from '../utils/wellnessReminders'
 
 const INACTIVE_TIMEOUT_SECONDS = 5 * 60
 
@@ -28,6 +39,8 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   const [activeBreakStartedAt, setActiveBreakStartedAt] = useState(null)
   const [activeBreakType, setActiveBreakType] = useState(null)
   const [hasSkippedReminderDuringSession, setHasSkippedReminderDuringSession] = useState(false)
+  const [wellnessSchedule, setWellnessSchedule] = useState({})
+  const [activeWellnessReminder, setActiveWellnessReminder] = useState(null)
   const [hiddenSince, setHiddenSince] = useState(null)
   const [isStopping, setIsStopping] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
@@ -38,6 +51,10 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   const [showEarlyBreakConfirm, setShowEarlyBreakConfirm] = useState(false)
   const breakReminderIntervalSeconds = Math.max(1, Math.round(settings.breakReminderIntervalMinutes * 60))
   const preferredBreakSeconds = Math.max(60, settings.preferredBreakDuration * 60)
+  const wellnessPreferences = normalizeWellnessPreferences(settings)
+  const wellnessIntensity = WELLNESS_INTENSITIES[wellnessPreferences.intensity]
+  const wellnessTypeKey = JSON.stringify(wellnessPreferences.activeTypes)
+  const elapsedRef = useRef(0)
 
   const token = localStorage.getItem('token')
   const username = localStorage.getItem('username')
@@ -66,6 +83,25 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
     setHiddenSince(null)
   }, [breakReminderIntervalSeconds])
 
+  const resetWellnessState = useCallback(() => {
+    setWellnessSchedule({})
+    setActiveWellnessReminder(null)
+  }, [])
+
+  const snoozeActiveWellnessReminder = useCallback(
+    (fromElapsedSeconds = elapsedRef.current) => {
+      if (!activeWellnessReminder) return
+
+      const reminderType = activeWellnessReminder.type
+      setActiveWellnessReminder(null)
+      setWellnessSchedule((currentSchedule) => ({
+        ...currentSchedule,
+        [reminderType]: fromElapsedSeconds + getWellnessSnoozeSeconds(settings),
+      }))
+    },
+    [activeWellnessReminder, settings]
+  )
+
   const getCurrentBreakPausedSeconds = useCallback(() => {
     if (!sessionPaused || !pausedAt) return 0
     return Math.max(0, Math.floor((new Date() - new Date(pausedAt)) / 1000))
@@ -89,12 +125,13 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
       } else {
         setHasSkippedReminderDuringSession(false)
         resetBreakState()
+        resetWellnessState()
         setElapsed(0)
       }
     } catch (error) {
       setStatusMessage(error.response?.data?.error || 'Unable to load your sessions right now.')
     }
-  }, [headers, resetBreakState])
+  }, [headers, resetBreakState, resetWellnessState])
 
   const stopSession = useCallback(
     async (reason = 'manual_end') => {
@@ -124,6 +161,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
               : ''
         )
         resetBreakState()
+        resetWellnessState()
         fetchSessions()
       } catch (error) {
         setStatusMessage(error.response?.data?.error || 'Unable to stop the current session.')
@@ -131,12 +169,16 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
         setIsStopping(false)
       }
     },
-    [activeSession, fetchSessions, getEffectivePausedSeconds, hasSkippedReminderDuringSession, headers, isStopping, resetBreakState]
+    [activeSession, fetchSessions, getEffectivePausedSeconds, hasSkippedReminderDuringSession, headers, isStopping, resetBreakState, resetWellnessState]
   )
 
   useEffect(() => {
     fetchSessions()
   }, [fetchSessions])
+
+  useEffect(() => {
+    elapsedRef.current = elapsed
+  }, [elapsed])
 
   useEffect(() => {
     setDailyLimit(settings.dailyPlaytimeLimit)
@@ -148,8 +190,18 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
       return
     }
 
-    setNextBreakReminderAt(elapsed + breakReminderIntervalSeconds)
+    setNextBreakReminderAt(elapsedRef.current + breakReminderIntervalSeconds)
   }, [activeSession, breakReminderIntervalSeconds])
+
+  useEffect(() => {
+    if (!activeSession || !wellnessPreferences.enabled) {
+      resetWellnessState()
+      return
+    }
+
+    setActiveWellnessReminder(null)
+    setWellnessSchedule(createWellnessScheduleFromSession(activeSession, settings, elapsedRef.current))
+  }, [activeSession, resetWellnessState, settings, wellnessPreferences.enabled, wellnessTypeKey])
 
   useEffect(() => {
     if (!activeSession) return undefined
@@ -162,14 +214,37 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
 
       setElapsed(seconds)
 
-      if (!sessionPaused && !showBreakReminder && !breakMode && seconds >= nextBreakReminderAt) {
+      if (!sessionPaused && !showBreakReminder && !breakMode && !activeWellnessReminder && seconds >= nextBreakReminderAt) {
         setCurrentReminderAt(new Date().toISOString())
         setShowBreakReminder(true)
+        return
+      }
+
+      if (!sessionPaused && pauseReason !== 'break' && !showBreakReminder && !breakMode && !activeWellnessReminder && wellnessPreferences.enabled) {
+        const nextWellness = getNextWellnessReminder(settings, wellnessSchedule, seconds)
+        if (nextWellness && seconds >= nextWellness.dueAt) {
+          setActiveWellnessReminder({
+            type: nextWellness.type,
+            remindedAt: new Date().toISOString(),
+          })
+        }
       }
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [activeSession, breakMode, getEffectivePausedSeconds, nextBreakReminderAt, sessionPaused, showBreakReminder])
+  }, [
+    activeSession,
+    activeWellnessReminder,
+    breakMode,
+    getEffectivePausedSeconds,
+    nextBreakReminderAt,
+    pauseReason,
+    sessionPaused,
+    settings,
+    showBreakReminder,
+    wellnessPreferences.enabled,
+    wellnessSchedule,
+  ])
 
   useEffect(() => {
     if (breakMode !== 'countdown' || breakTimeLeft <= 0 || pauseReason === 'manual') return undefined
@@ -180,6 +255,11 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
 
     return () => clearInterval(interval)
   }, [breakMode, breakTimeLeft, pauseReason])
+
+  useEffect(() => {
+    if (pauseReason !== 'break' && !breakMode) return
+    snoozeActiveWellnessReminder(elapsedRef.current)
+  }, [breakMode, pauseReason, snoozeActiveWellnessReminder])
 
   useEffect(() => {
     if (!transientMessage) return undefined
@@ -237,6 +317,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
     try {
       setStatusMessage('')
       resetBreakState()
+      resetWellnessState()
       setElapsed(0)
       setHasSkippedReminderDuringSession(false)
 
@@ -247,6 +328,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
       )
 
       setActiveSession(res.data)
+      setWellnessSchedule(createWellnessSchedule(settings, 0))
       setGameName('')
       setNextBreakReminderAt(breakReminderIntervalSeconds)
       fetchSessions()
@@ -257,6 +339,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   }
 
   const pauseForBreak = (mode, durationSeconds = 0) => {
+    snoozeActiveWellnessReminder(elapsedRef.current)
     const now = new Date().toISOString()
     setBreakTimeLeft(durationSeconds)
     setBreakMode(mode)
@@ -358,35 +441,54 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
     }
   }
 
+  const completeWellnessReminder = async (action) => {
+    if (!activeSession || !activeWellnessReminder) return
+
+    const reminder = activeWellnessReminder
+    const nextDueAt = elapsed + getWellnessIntervalSeconds(reminder.type, settings)
+
+    setActiveWellnessReminder(null)
+    setWellnessSchedule((currentSchedule) => ({
+      ...currentSchedule,
+      [reminder.type]: nextDueAt,
+    }))
+
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/sessions/${activeSession._id}/wellness-reminders`,
+        {
+          action,
+          reminderType: reminder.type,
+          remindedAt: reminder.remindedAt,
+        },
+        { headers }
+      )
+
+      setActiveSession(res.data)
+      setSessions((currentSessions) =>
+        currentSessions.map((session) => (session._id === res.data._id ? res.data : session))
+      )
+    } catch (error) {
+      setStatusMessage(error.response?.data?.error || 'Wellness nudge handled, but it could not be saved.')
+    }
+  }
+
+  const snoozeWellnessReminder = () => {
+    if (!activeWellnessReminder) return
+
+    const reminder = activeWellnessReminder
+    setActiveWellnessReminder(null)
+    setWellnessSchedule((currentSchedule) => ({
+      ...currentSchedule,
+      [reminder.type]: elapsed + getWellnessSnoozeSeconds(settings),
+    }))
+    setTransientMessage('Wellness nudge tucked away for a bit.')
+  }
+
   const updateDailyLimit = (value) => {
     const nextLimit = Math.max(0, Number(value) || 0)
     setDailyLimit(nextLimit)
     setSettings({ ...settings, dailyPlaytimeLimit: nextLimit })
-  }
-
-  const updateReminderSettings = (partialSettings) => {
-    const nextSettings = syncReminderSettings(
-      {
-        ...partialSettings,
-        reminderPreset: partialSettings.reminderPreset || 'custom',
-      },
-      settings
-    )
-
-    setSettings(nextSettings)
-
-    if (activeSession) {
-      setNextBreakReminderAt(elapsed + Math.max(1, Math.round(nextSettings.breakReminderIntervalMinutes * 60)))
-    }
-  }
-
-  const applyPreset = (presetKey) => {
-    const nextSettings = applyReminderPreset(presetKey, settings)
-    setSettings(nextSettings)
-
-    if (activeSession) {
-      setNextBreakReminderAt(elapsed + Math.max(1, Math.round(nextSettings.breakReminderIntervalMinutes * 60)))
-    }
   }
 
   const saveSessionTitle = async () => {
@@ -433,12 +535,33 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   const nextReminderProgress = activeSession ? Math.min((nextReminderSeconds / breakReminderIntervalSeconds) * 100, 100) : 100
   const nextBreakRingValue = activeSession ? Math.max(0, 100 - nextReminderProgress) : 0
   const activePreset = resolveReminderPresetKey(settings.reminderPreset)
-  const activePresetDescription = REMINDER_PRESETS[activePreset]?.description || REMINDER_PRESETS.custom.description
   const activePresetLabel = REMINDER_PRESETS[activePreset]?.label || 'Custom'
   const elapsedBreakSeconds = activeBreakStartedAt
     ? Math.max(0, Math.floor((new Date() - new Date(activeBreakStartedAt)) / 1000))
     : 0
   const canEndBreakEarly = breakMode === 'countdown' && breakTimeLeft > 0 && elapsedBreakSeconds >= 15
+  const wellnessCounts = getWellnessCounts(activeSession || {})
+  const nextWellnessReminder = activeSession
+    ? getNextWellnessReminder(settings, wellnessSchedule, elapsed)
+    : null
+  const nextWellnessConfig = nextWellnessReminder ? WELLNESS_REMINDER_TYPES[nextWellnessReminder.type] : null
+  const nextWellnessSeconds = activeSession && nextWellnessReminder
+    ? Math.max(0, nextWellnessReminder.dueAt - elapsed)
+    : 0
+  const activeWellnessConfig = activeWellnessReminder
+    ? WELLNESS_REMINDER_TYPES[activeWellnessReminder.type]
+    : null
+  const wellnessDecisionCount = wellnessCounts.completed + wellnessCounts.skipped
+  const wellnessCompletionRate = wellnessDecisionCount
+    ? Math.round((wellnessCounts.completed / wellnessDecisionCount) * 100)
+    : 0
+  const wellnessPanelStatus = pauseReason === 'break' || breakMode
+    ? 'Paused during break'
+    : activeSession && nextWellnessConfig
+      ? formatTimerClock(nextWellnessSeconds)
+      : wellnessPreferences.enabled
+        ? 'Starts when you begin playing'
+        : 'Enable in Settings'
 
   const pauseBannerMessage = pauseReason === 'manual'
     ? 'Session paused. Your timer and next reminder are both on hold.'
@@ -551,6 +674,28 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
                 </Button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeWellnessConfig && (
+        <div className="wellness-toast" role="status" aria-live="polite">
+          <div className="wellness-toast__meta">
+            <span className="badge badge--subtle">Wellness nudge</span>
+            <span>{wellnessIntensity?.label || 'Balanced'} pace</span>
+          </div>
+          <h2 className="wellness-toast__title">{activeWellnessConfig.title}</h2>
+          <p className="wellness-toast__message">{activeWellnessConfig.message}</p>
+          <div className="wellness-toast__actions">
+            <Button variant="primary" onClick={() => completeWellnessReminder('completed')}>
+              Done
+            </Button>
+            <Button variant="secondary" onClick={snoozeWellnessReminder}>
+              Remind me later
+            </Button>
+            <Button variant="ghost" onClick={() => completeWellnessReminder('skipped')}>
+              Skip
+            </Button>
           </div>
         </div>
       )}
@@ -690,60 +835,45 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
               </div>
 
               <aside className="session-controls">
-                <Card title="Reminder Controls" subtitle={activePresetDescription}>
-                  <div className="stack stack--tight">
-                    <div className="preset-grid preset-grid--compact">
-                      {Object.entries(REMINDER_PRESETS).map(([key, preset]) => (
-                        <button
-                          key={key}
-                          type="button"
-                          className={`preset-chip preset-chip--compact ${activePreset === key ? 'preset-chip--active' : ''}`}
-                          onClick={() => applyPreset(key)}
-                        >
-                          <strong>{preset.label}</strong>
-                          <span className="preset-chip__subtitle">{preset.subtitle || 'Your Rules'}</span>
-                          {preset.intervalMinutes ? (
-                            <span className="preset-chip__meta">
-                              {preset.intervalMinutes}m / {preset.breakDurationMinutes}m
-                            </span>
-                          ) : (
-                            <span className="preset-chip__meta">User-defined timing</span>
-                          )}
-                        </button>
-                      ))}
+                <Card
+                  title="Wellness Nudges"
+                  subtitle={wellnessPreferences.enabled ? wellnessIntensity?.description : 'Off for this setup'}
+                >
+                  <div className="wellness-widget wellness-widget--session">
+                    <div className="wellness-widget__next">
+                      <p className="session-detail__label">Next nudge</p>
+                      <h3 className="wellness-widget__title">
+                        {activeSession && nextWellnessConfig ? nextWellnessConfig.label : 'No active session'}
+                      </h3>
+                      <p className="wellness-widget__countdown">{wellnessPanelStatus}</p>
+                      <div className="wellness-widget__bar">
+                        <span
+                          style={{
+                            width: activeSession && nextWellnessReminder
+                              ? `${Math.max(4, Math.min(100, 100 - (nextWellnessSeconds / getWellnessIntervalSeconds(nextWellnessReminder.type, settings)) * 100))}%`
+                              : '0%',
+                          }}
+                        />
+                      </div>
                     </div>
 
-                    <div className="settings-grid settings-grid--compact">
-                      <label className="field">
-                        <span className="field__label">Interval</span>
-                        <input
-                          className="input"
-                          type="number"
-                          min="0.1"
-                          step="0.1"
-                          value={settings.breakReminderIntervalMinutes}
-                          onChange={(event) =>
-                            updateReminderSettings({ breakReminderIntervalMinutes: Math.max(0.1, Number(event.target.value) || 0.1) })
-                          }
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span className="field__label">Break</span>
-                        <select
-                          className="input input--select"
-                          value={settings.preferredBreakDuration}
-                          onChange={(event) =>
-                            updateReminderSettings({ preferredBreakDuration: Number(event.target.value) || 5 })
-                          }
-                        >
-                          {[1, 5, 10, 15].map((value) => (
-                            <option key={value} value={value}>
-                              {value} minutes
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                    <div className="wellness-widget__metrics">
+                      <div>
+                        <strong>{wellnessCounts.completed}</strong>
+                        <span>Done</span>
+                      </div>
+                      <div>
+                        <strong>{wellnessCounts.skipped}</strong>
+                        <span>Skipped</span>
+                      </div>
+                      <div>
+                        <strong>{wellnessCompletionRate}%</strong>
+                        <span>Follow-through</span>
+                      </div>
+                      <div>
+                        <strong>{wellnessIntensity?.label || 'Balanced'}</strong>
+                        <span>Intensity</span>
+                      </div>
                     </div>
                   </div>
                 </Card>

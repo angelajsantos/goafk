@@ -11,6 +11,14 @@ export const defaultSettings = {
   reminderMode: 'balanced',
   gentleReminderMode: true,
   focusMode: false,
+  wellnessRemindersEnabled: true,
+  wellnessIntensity: 'balanced',
+  wellnessReminderTypes: {
+    eye: true,
+    posture: true,
+    stretch: true,
+    walk: true,
+  },
 }
 
 export const mockSteamLibrary = [

@@ -5,6 +5,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { API_BASE_URL } from '../config/api'
 import { formatDateTime, formatDuration, getEndingReasonLabel } from '../utils/sessionPresentation'
+import { WELLNESS_REMINDER_TYPES, getWellnessCounts } from '../utils/wellnessReminders'
 
 export default function Sessions({ setToken, appearanceMode, onToggleAppearance }) {
   const [sessions, setSessions] = useState([])
@@ -38,6 +39,7 @@ export default function Sessions({ setToken, appearanceMode, onToggleAppearance 
   const totalPlaytimeSeconds = sessions.reduce((sum, session) => sum + (session.durationSeconds || 0), 0)
   const totalBreaksTaken = sessions.reduce((sum, session) => sum + (session.breaksTaken || 0), 0)
   const totalBreaksSkipped = sessions.reduce((sum, session) => sum + (session.breaksSkipped || 0), 0)
+  const totalWellnessCompleted = sessions.reduce((sum, session) => sum + getWellnessCounts(session).completed, 0)
   const averageSessionSeconds = totalSessions ? Math.round(totalPlaytimeSeconds / totalSessions) : 0
 
   const startEditingSession = (session) => {
@@ -90,7 +92,7 @@ export default function Sessions({ setToken, appearanceMode, onToggleAppearance 
           <Card title="Recent Session Overview" subtitle="Most recent 50 sessions, newest first">
             {error ? <p className="error-text">{error}</p> : null}
 
-            <div className="stats-grid stats-grid--five">
+            <div className="stats-grid stats-grid--six">
               <div>
                 <p className="stat-value">{totalSessions}</p>
                 <p className="stat-label">Recent sessions</p>
@@ -108,6 +110,10 @@ export default function Sessions({ setToken, appearanceMode, onToggleAppearance 
                 <p className="stat-label">Breaks skipped</p>
               </div>
               <div>
+                <p className="stat-value">{totalWellnessCompleted}</p>
+                <p className="stat-label">Wellness done</p>
+              </div>
+              <div>
                 <p className="stat-value">{formatDuration(averageSessionSeconds)}</p>
                 <p className="stat-label">Average session</p>
               </div>
@@ -123,7 +129,10 @@ export default function Sessions({ setToken, appearanceMode, onToggleAppearance 
               </div>
             ) : sessions.length > 0 ? (
               <div className="session-history">
-                {sessions.map((session) => (
+                {sessions.map((session) => {
+                  const wellness = getWellnessCounts(session)
+
+                  return (
                   <details key={session._id} className="session-record" open={false}>
                     <summary className="session-record__summary">
                       <div>
@@ -189,10 +198,33 @@ export default function Sessions({ setToken, appearanceMode, onToggleAppearance 
                           <p className="session-detail__value">{session.breaksSkipped || 0}</p>
                         </div>
                         <div className="session-detail">
+                          <p className="session-detail__label">Wellness done</p>
+                          <p className="session-detail__value">{wellness.completed}</p>
+                        </div>
+                        <div className="session-detail">
+                          <p className="session-detail__label">Wellness skipped</p>
+                          <p className="session-detail__value">{wellness.skipped}</p>
+                        </div>
+                        <div className="session-detail">
                           <p className="session-detail__label">Longest break</p>
                           <p className="session-detail__value">{formatDuration(session.longestBreakSeconds || 0)}</p>
                         </div>
                       </div>
+
+                      {wellness.completed + wellness.skipped > 0 ? (
+                        <div className="wellness-summary">
+                          {Object.entries(WELLNESS_REMINDER_TYPES).map(([type, reminder]) => {
+                            const count = wellness.byType[type]
+                            if (!count.completed && !count.skipped) return null
+
+                            return (
+                              <span key={type} className="badge badge--subtle">
+                                {reminder.label}: {count.completed} done / {count.skipped} skipped
+                              </span>
+                            )
+                          })}
+                        </div>
+                      ) : null}
 
                       <div className="session-record__footer">
                         <span className="badge badge--subtle">Ending reason: {getEndingReasonLabel(session.endingReason)}</span>
@@ -202,7 +234,8 @@ export default function Sessions({ setToken, appearanceMode, onToggleAppearance 
                       </div>
                     </div>
                   </details>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="empty-state">

@@ -5,6 +5,28 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WELLNESS_REMINDER_TYPES = {
+    eye: {
+        label: 'Eye reset',
+        completedField: 'eyeRemindersCompleted',
+        skippedField: 'eyeRemindersSkipped',
+    },
+    posture: {
+        label: 'Posture check',
+        completedField: 'postureChecksCompleted',
+        skippedField: 'postureChecksSkipped',
+    },
+    stretch: {
+        label: 'Stretch break',
+        completedField: 'stretchBreaksCompleted',
+        skippedField: 'stretchBreaksSkipped',
+    },
+    walk: {
+        label: 'Two-minute walk',
+        completedField: 'walkRemindersCompleted',
+        skippedField: 'walkRemindersSkipped',
+    },
+};
 
 const auth = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -47,12 +69,51 @@ const getSessionSummary = (session) => {
     };
 };
 
+const getWellnessSummary = (session) => {
+    const reminders = Array.isArray(session.wellnessReminders) ? session.wellnessReminders : [];
+    const byType = Object.keys(WELLNESS_REMINDER_TYPES).reduce((counts, type) => {
+        counts[type] = { completed: 0, skipped: 0 };
+        return counts;
+    }, {});
+
+    reminders.forEach((entry) => {
+        const type = entry.reminderType;
+        if (!byType[type]) return;
+
+        if (entry.action === 'completed') {
+            byType[type].completed += 1;
+        }
+
+        if (entry.action === 'skipped') {
+            byType[type].skipped += 1;
+        }
+    });
+
+    const completed = Object.values(byType).reduce((sum, entry) => sum + entry.completed, 0);
+    const skipped = Object.values(byType).reduce((sum, entry) => sum + entry.skipped, 0);
+
+    return {
+        completed,
+        skipped,
+        byType,
+    };
+};
+
 const applySummaryFields = (session) => {
     const summary = getSessionSummary(session);
+    const wellnessSummary = getWellnessSummary(session);
     session.breaksTaken = summary.breaksTaken;
     session.breaksSkipped = summary.breaksSkipped;
     session.totalBreakSeconds = summary.totalBreakSeconds;
     session.longestBreakSeconds = summary.longestBreakSeconds;
+    session.wellnessRemindersCompleted = wellnessSummary.completed;
+    session.wellnessRemindersSkipped = wellnessSummary.skipped;
+
+    Object.entries(WELLNESS_REMINDER_TYPES).forEach(([type, config]) => {
+        session[config.completedField] = wellnessSummary.byType[type].completed;
+        session[config.skippedField] = wellnessSummary.byType[type].skipped;
+    });
+
     return session;
 };
 
@@ -72,6 +133,7 @@ const finalizeSession = (session, payload = {}) => {
     session.breaksSkipped = summary.breaksSkipped;
     session.totalBreakSeconds = summary.totalBreakSeconds;
     session.longestBreakSeconds = summary.longestBreakSeconds;
+    applySummaryFields(session);
 
     return session;
 };
@@ -190,6 +252,38 @@ const buildSessionStreak = (completedSessions) => {
     };
 };
 
+const buildWellnessStreak = (completedSessions) => {
+    let current = 0;
+    let best = 0;
+
+    completedSessions
+        .sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt))
+        .forEach((session) => {
+            if (getWellnessSummary(session).completed > 0) {
+                current += 1;
+                best = Math.max(best, current);
+            } else {
+                current = 0;
+            }
+        });
+
+    const reverseOrdered = [...completedSessions].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    let trailing = 0;
+    for (const session of reverseOrdered) {
+        if (getWellnessSummary(session).completed > 0) {
+            trailing += 1;
+        } else {
+            break;
+        }
+    }
+
+    return {
+        label: 'Sessions with a wellness nudge done',
+        current: trailing,
+        best,
+    };
+};
+
 const buildStatistics = (sessions, dailyLimitMinutes) => {
     const completedSessions = getCompletedSessions(sessions);
     const weekStart = getRangeStart(6);
@@ -202,6 +296,32 @@ const buildStatistics = (sessions, dailyLimitMinutes) => {
     const totalPlaytimeSeconds = sumDurationSeconds(completedSessions);
     const totalBreaksTaken = completedSessions.reduce((sum, session) => sum + (session.breaksTaken || 0), 0);
     const totalBreaksSkipped = completedSessions.reduce((sum, session) => sum + (session.breaksSkipped || 0), 0);
+    const wellnessByType = Object.keys(WELLNESS_REMINDER_TYPES).reduce((counts, type) => {
+        counts[type] = { completed: 0, skipped: 0 };
+        return counts;
+    }, {});
+
+    completedSessions.forEach((session) => {
+        const wellnessSummary = getWellnessSummary(session);
+        Object.keys(WELLNESS_REMINDER_TYPES).forEach((type) => {
+            wellnessByType[type].completed += wellnessSummary.byType[type].completed;
+            wellnessByType[type].skipped += wellnessSummary.byType[type].skipped;
+        });
+    });
+
+    const totalWellnessCompleted = Object.values(wellnessByType).reduce((sum, entry) => sum + entry.completed, 0);
+    const totalWellnessSkipped = Object.values(wellnessByType).reduce((sum, entry) => sum + entry.skipped, 0);
+    const totalWellnessDecisions = totalWellnessCompleted + totalWellnessSkipped;
+    const mostCompletedWellnessType = Object.entries(wellnessByType).reduce((top, [type, entry]) => {
+        if (!top || entry.completed > top.count) {
+            return {
+                type,
+                label: WELLNESS_REMINDER_TYPES[type].label,
+                count: entry.completed,
+            };
+        }
+        return top;
+    }, null);
     const longestSession = completedSessions.reduce((longest, session) => {
         if (!longest || (session.durationSeconds || 0) > (longest.durationSeconds || 0)) {
             return session;
@@ -265,6 +385,11 @@ const buildStatistics = (sessions, dailyLimitMinutes) => {
             totalBreaksTaken,
             totalBreaksSkipped,
             averageBreaksPerSession: completedSessions.length ? Number((totalBreaksTaken / completedSessions.length).toFixed(1)) : 0,
+            totalWellnessCompleted,
+            totalWellnessSkipped,
+            wellnessCompletionRate: totalWellnessDecisions
+                ? Math.round((totalWellnessCompleted / totalWellnessDecisions) * 100)
+                : 0,
             longestSessionSeconds: longestSession?.durationSeconds || 0,
             longestBreakSeconds: longestBreak?.seconds || 0,
             endingReasonCounts,
@@ -282,6 +407,16 @@ const buildStatistics = (sessions, dailyLimitMinutes) => {
             longestBreak: longestBreak?.seconds ? longestBreak : null,
         },
         streak,
+        wellness: {
+            totalCompleted: totalWellnessCompleted,
+            totalSkipped: totalWellnessSkipped,
+            completionRate: totalWellnessDecisions
+                ? Math.round((totalWellnessCompleted / totalWellnessDecisions) * 100)
+                : 0,
+            mostCompletedType: mostCompletedWellnessType?.count ? mostCompletedWellnessType : null,
+            byType: wellnessByType,
+            streak: buildWellnessStreak(completedSessions),
+        },
     };
 };
 
@@ -351,6 +486,38 @@ router.post('/:id/reminders', auth, async (req, res) => {
             breakStartedAt,
             breakEndedAt,
             breakDurationSeconds,
+        });
+
+        applySummaryFields(session);
+        await session.save();
+        res.json(session);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+router.post('/:id/wellness-reminders', auth, async (req, res) => {
+    try {
+        const session = await Session.findById(req.params.id);
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+        if (session.userId.toString() !== req.userId) return res.status(403).json({ error: 'Forbidden' });
+        if (session.endedAt) return res.status(409).json({ error: 'Session already ended' });
+
+        const action = req.body.action;
+        const reminderType = req.body.reminderType;
+
+        if (!['completed', 'skipped'].includes(action)) {
+            return res.status(400).json({ error: 'Invalid wellness reminder action' });
+        }
+
+        if (!WELLNESS_REMINDER_TYPES[reminderType]) {
+            return res.status(400).json({ error: 'Invalid wellness reminder type' });
+        }
+
+        session.wellnessReminders.push({
+            remindedAt: toDate(req.body.remindedAt),
+            action,
+            reminderType,
         });
 
         applySummaryFields(session);

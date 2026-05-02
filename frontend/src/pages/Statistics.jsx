@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import AppLayout from '../components/layout/AppLayout'
 import Card from '../components/ui/Card'
 import { API_BASE_URL } from '../config/api'
 import { formatDuration, getEndingReasonLabel } from '../utils/sessionPresentation'
+import { WELLNESS_REMINDER_TYPES } from '../utils/wellnessReminders'
 
 export default function Statistics({ setToken, settings, appearanceMode, onToggleAppearance }) {
   const [stats, setStats] = useState(null)
@@ -11,13 +12,9 @@ export default function Statistics({ setToken, settings, appearanceMode, onToggl
   const [error, setError] = useState('')
   const username = localStorage.getItem('username')
   const token = localStorage.getItem('token')
-  const headers = { Authorization: `Bearer ${token}` }
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token])
 
-  useEffect(() => {
-    fetchStats()
-  }, [settings.dailyPlaytimeLimit])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
@@ -31,11 +28,16 @@ export default function Statistics({ setToken, settings, appearanceMode, onToggl
     } finally {
       setLoading(false)
     }
-  }
+  }, [headers, settings.dailyPlaytimeLimit])
+
+  useEffect(() => {
+    fetchStats()
+  }, [fetchStats])
 
   const totals = stats?.totals
   const highlights = stats?.highlights
   const streak = stats?.streak
+  const wellness = stats?.wellness
   const mostCommonEnding = totals?.endingReasonCounts
     ? Object.entries(totals.endingReasonCounts).sort((a, b) => b[1] - a[1])[0]?.[0]
     : null
@@ -123,6 +125,49 @@ export default function Statistics({ setToken, settings, appearanceMode, onToggl
                 <div className="streak-panel__meta">
                   <span className="badge badge--warm">Best: {streak.best}</span>
                   <span className="badge badge--subtle">Limit: {settings.dailyPlaytimeLimit} min</span>
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <div className="span-12">
+          <Card title="Wellness Nudges" subtitle="General comfort reminders completed during saved sessions">
+            {loading || !wellness ? (
+              <div className="empty-state">
+                <p>Waiting for wellness data...</p>
+              </div>
+            ) : (
+              <div className="wellness-stats-layout">
+                <div className="stats-grid stats-grid--four">
+                  <div>
+                    <p className="stat-value">{wellness.totalCompleted}</p>
+                    <p className="stat-label">Completed</p>
+                  </div>
+                  <div>
+                    <p className="stat-value">{wellness.completionRate}%</p>
+                    <p className="stat-label">Completion rate</p>
+                  </div>
+                  <div>
+                    <p className="stat-value">{wellness.mostCompletedType?.label || 'None yet'}</p>
+                    <p className="stat-label">Most completed</p>
+                  </div>
+                  <div>
+                    <p className="stat-value">{wellness.streak?.current || 0}</p>
+                    <p className="stat-label">Wellness streak</p>
+                  </div>
+                </div>
+
+                <div className="wellness-summary">
+                  {Object.entries(WELLNESS_REMINDER_TYPES).map(([type, reminder]) => {
+                    const count = wellness.byType?.[type] || { completed: 0, skipped: 0 }
+
+                    return (
+                      <span key={type} className="badge badge--subtle">
+                        {reminder.label}: {count.completed} done / {count.skipped} skipped
+                      </span>
+                    )
+                  })}
                 </div>
               </div>
             )}

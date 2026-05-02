@@ -4,6 +4,12 @@ import AppLayout from '../components/layout/AppLayout'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { API_BASE_URL } from '../config/api'
+import { applyReminderPreset, REMINDER_PRESETS, resolveReminderPresetKey, syncReminderSettings } from '../utils/reminderPresets'
+import {
+  WELLNESS_INTENSITIES,
+  WELLNESS_REMINDER_TYPES,
+  normalizeWellnessPreferences,
+} from '../utils/wellnessReminders'
 
 const defaultAccount = {
   username: '',
@@ -26,6 +32,41 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
   const [isSavingPassword, setIsSavingPassword] = useState(false)
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token])
+  const wellnessPreferences = normalizeWellnessPreferences(settings)
+  const activePreset = resolveReminderPresetKey(settings.reminderPreset)
+  const activePresetDescription = REMINDER_PRESETS[activePreset]?.description || REMINDER_PRESETS.custom.description
+
+  const updateBreakReminderSettings = (partialSettings) => {
+    const nextSettings = syncReminderSettings(
+      {
+        ...partialSettings,
+        reminderPreset: partialSettings.reminderPreset || 'custom',
+      },
+      settings
+    )
+
+    setSettings(nextSettings)
+  }
+
+  const applyBreakPreset = (presetKey) => {
+    setSettings(applyReminderPreset(presetKey, settings))
+  }
+
+  const updateWellnessSettings = (partialSettings) => {
+    setSettings({
+      ...settings,
+      ...partialSettings,
+    })
+  }
+
+  const toggleWellnessType = (type) => {
+    updateWellnessSettings({
+      wellnessReminderTypes: {
+        ...wellnessPreferences.activeTypes,
+        [type]: !wellnessPreferences.activeTypes[type],
+      },
+    })
+  }
 
   useEffect(() => {
     const fetchAccount = async () => {
@@ -165,6 +206,117 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
                 <Button variant="primary" onClick={saveDisplayName} disabled={isSavingProfile || !displayName.trim()}>
                   {isSavingProfile ? 'Saving...' : 'Save profile'}
                 </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="span-12">
+          <Card title="Reminder Controls" subtitle={activePresetDescription}>
+            <div className="account-stack">
+              <div className="preset-grid">
+                {Object.entries(REMINDER_PRESETS).map(([key, preset]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`preset-chip ${activePreset === key ? 'preset-chip--active' : ''}`}
+                    onClick={() => applyBreakPreset(key)}
+                  >
+                    <strong>{preset.label}</strong>
+                    <span className="preset-chip__subtitle">{preset.subtitle || 'Your Rules'}</span>
+                    {preset.intervalMinutes ? (
+                      <span className="preset-chip__meta">
+                        {preset.intervalMinutes}m reminder / {preset.breakDurationMinutes}m break
+                      </span>
+                    ) : (
+                      <span className="preset-chip__meta">User-defined timing</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              <div className="settings-grid">
+                <label className="field">
+                  <span className="field__label">Break reminder interval</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={settings.breakReminderIntervalMinutes}
+                    onChange={(event) =>
+                      updateBreakReminderSettings({ breakReminderIntervalMinutes: Math.max(0.1, Number(event.target.value) || 0.1) })
+                    }
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="field__label">Preferred break length</span>
+                  <select
+                    className="input input--select"
+                    value={settings.preferredBreakDuration}
+                    onChange={(event) =>
+                      updateBreakReminderSettings({ preferredBreakDuration: Number(event.target.value) || 5 })
+                    }
+                  >
+                    {[1, 5, 10, 15].map((value) => (
+                      <option key={value} value={value}>
+                        {value} minutes
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="span-12">
+          <Card title="Wellness Preferences" subtitle="General comfort nudges for longer sessions">
+            <div className="account-stack">
+              <button
+                type="button"
+                className={`toggle ${wellnessPreferences.enabled ? 'toggle--on' : ''}`}
+                onClick={() => updateWellnessSettings({ wellnessRemindersEnabled: !wellnessPreferences.enabled })}
+              >
+                <div>
+                  <p className="settings-list__title">Wellness reminders</p>
+                  <p className="settings-list__meta">Gentle eye, posture, stretch, and walk check-ins during active sessions.</p>
+                </div>
+                <span className="badge">{wellnessPreferences.enabled ? 'On' : 'Off'}</span>
+              </button>
+
+              <div className="preset-grid">
+                {Object.entries(WELLNESS_INTENSITIES).map(([key, intensity]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`preset-chip ${wellnessPreferences.intensity === key ? 'preset-chip--active' : ''}`}
+                    onClick={() => updateWellnessSettings({ wellnessIntensity: key })}
+                  >
+                    <strong>{intensity.label}</strong>
+                    <span>{intensity.description}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="wellness-type-grid">
+                {Object.entries(WELLNESS_REMINDER_TYPES).map(([type, reminder]) => (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`toggle ${wellnessPreferences.activeTypes[type] ? 'toggle--on' : ''}`}
+                    onClick={() => toggleWellnessType(type)}
+                  >
+                    <div>
+                      <p className="settings-list__title">{reminder.label}</p>
+                      <p className="settings-list__meta">{reminder.title}</p>
+                    </div>
+                    <span className="badge badge--subtle">
+                      {wellnessPreferences.activeTypes[type] ? 'Active' : 'Muted'}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           </Card>
