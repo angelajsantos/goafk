@@ -31,7 +31,7 @@ export const WELLNESS_INTENSITIES = {
     description: 'Fewer nudges for relaxed sessions.',
     snoozeMinutes: 10,
     intervals: {
-      eye: 30,
+      eye: 0.5,
       posture: 45,
       walk: 90,
     },

@@ -8,6 +8,12 @@ import { API_BASE_URL } from '../config/api'
 import { formatDuration, formatShortDate, formatTimerClock } from '../utils/sessionPresentation'
 import { REMINDER_PRESETS, resolveReminderPresetKey } from '../utils/reminderPresets'
 import {
+  ensureBrowserNotificationPermission,
+  getBrowserNotificationPermission,
+  sendBrowserNotification,
+} from '../utils/browserNotifications'
+import { playReminderChime, prepareReminderChime } from '../utils/reminderChime'
+import {
   WELLNESS_INTENSITIES,
   WELLNESS_REMINDER_TYPES,
   createWellnessSchedule,
@@ -18,8 +24,6 @@ import {
   getWellnessSnoozeSeconds,
   normalizeWellnessPreferences,
 } from '../utils/wellnessReminders'
-
-const INACTIVE_TIMEOUT_SECONDS = 5 * 60
 
 export default function Dashboard({ setToken, settings, setSettings, onToggleAppearance }) {
   const [sessions, setSessions] = useState([])
@@ -41,7 +45,6 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   const [hasSkippedReminderDuringSession, setHasSkippedReminderDuringSession] = useState(false)
   const [wellnessSchedule, setWellnessSchedule] = useState({})
   const [activeWellnessReminder, setActiveWellnessReminder] = useState(null)
-  const [hiddenSince, setHiddenSince] = useState(null)
   const [isStopping, setIsStopping] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
   const [transientMessage, setTransientMessage] = useState('')
@@ -49,6 +52,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   const [editingTitle, setEditingTitle] = useState('')
   const [isSavingTitle, setIsSavingTitle] = useState(false)
   const [showEarlyBreakConfirm, setShowEarlyBreakConfirm] = useState(false)
+  const [notificationPermission, setNotificationPermission] = useState(getBrowserNotificationPermission)
   const breakReminderIntervalSeconds = Math.max(1, Math.round(settings.breakReminderIntervalMinutes * 60))
   const preferredBreakSeconds = Math.max(60, settings.preferredBreakDuration * 60)
   const wellnessPreferences = normalizeWellnessPreferences(settings)
@@ -80,13 +84,38 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
     setActiveBreakStartedAt(null)
     setActiveBreakType(null)
     setShowEarlyBreakConfirm(false)
-    setHiddenSince(null)
   }, [breakReminderIntervalSeconds])
 
   const resetWellnessState = useCallback(() => {
     setWellnessSchedule({})
     setActiveWellnessReminder(null)
   }, [])
+
+  const requestNotificationPermission = useCallback(async () => {
+    if (!settings.notifications) return getBrowserNotificationPermission()
+
+    const permission = await ensureBrowserNotificationPermission()
+    setNotificationPermission(permission)
+    return permission
+  }, [settings.notifications])
+
+  const notifyReminder = useCallback(
+    (title, body, tag) => {
+      if (!settings.notifications || notificationPermission !== 'granted') return
+
+      sendBrowserNotification({
+        title,
+        body,
+        tag,
+      })
+    },
+    [notificationPermission, settings.notifications]
+  )
+
+  const playReminderSound = useCallback(() => {
+    if (!settings.reminderSound) return
+    playReminderChime()
+  }, [settings.reminderSound])
 
   const snoozeActiveWellnessReminder = useCallback(
     (fromElapsedSeconds = elapsedRef.current) => {
@@ -156,9 +185,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
         setStatusMessage(
           endingReason === 'limit_reached'
             ? 'Daily limit reached. Session saved and ended gently.'
-            : endingReason === 'inactive_timeout'
-              ? 'Session ended after inactivity so your history stays accurate.'
-              : ''
+            : ''
         )
         resetBreakState()
         resetWellnessState()
@@ -175,6 +202,10 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   useEffect(() => {
     fetchSessions()
   }, [fetchSessions])
+
+  useEffect(() => {
+    setNotificationPermission(getBrowserNotificationPermission())
+  }, [settings.notifications])
 
   useEffect(() => {
     elapsedRef.current = elapsed
@@ -217,16 +248,29 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
       if (!sessionPaused && !showBreakReminder && !breakMode && !activeWellnessReminder && seconds >= nextBreakReminderAt) {
         setCurrentReminderAt(new Date().toISOString())
         setShowBreakReminder(true)
+        playReminderSound()
+        notifyReminder(
+          'Break check-in',
+          `You've been playing for ${formatDuration(seconds)}. Want to reset for a bit?`,
+          'goafk-break-reminder'
+        )
         return
       }
 
       if (!sessionPaused && pauseReason !== 'break' && !showBreakReminder && !breakMode && !activeWellnessReminder && wellnessPreferences.enabled) {
         const nextWellness = getNextWellnessReminder(settings, wellnessSchedule, seconds)
         if (nextWellness && seconds >= nextWellness.dueAt) {
+          const reminderConfig = WELLNESS_REMINDER_TYPES[nextWellness.type]
           setActiveWellnessReminder({
             type: nextWellness.type,
             remindedAt: new Date().toISOString(),
           })
+          playReminderSound()
+          notifyReminder(
+            reminderConfig.title,
+            reminderConfig.message,
+            `goafk-wellness-${nextWellness.type}`
+          )
         }
       }
     }, 1000)
@@ -238,7 +282,9 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
     breakMode,
     getEffectivePausedSeconds,
     nextBreakReminderAt,
+    notifyReminder,
     pauseReason,
+    playReminderSound,
     sessionPaused,
     settings,
     showBreakReminder,
@@ -272,31 +318,6 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   }, [transientMessage])
 
   useEffect(() => {
-    const onVisibilityChange = () => {
-      if (!activeSession) return
-
-      if (document.hidden) {
-        setHiddenSince(new Date())
-      } else {
-        setHiddenSince(null)
-      }
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [activeSession])
-
-  useEffect(() => {
-    if (!activeSession || !hiddenSince || isStopping) return undefined
-
-    const timeout = window.setTimeout(() => {
-      stopSession('inactive_timeout')
-    }, INACTIVE_TIMEOUT_SECONDS * 1000)
-
-    return () => window.clearTimeout(timeout)
-  }, [activeSession, hiddenSince, isStopping, stopSession])
-
-  useEffect(() => {
     if (!activeSession) {
       setIsEditingTitle(false)
       setEditingTitle('')
@@ -320,6 +341,10 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
       resetWellnessState()
       setElapsed(0)
       setHasSkippedReminderDuringSession(false)
+      await requestNotificationPermission()
+      if (settings.reminderSound) {
+        await prepareReminderChime()
+      }
 
       const res = await axios.post(
         `${API_BASE_URL}/api/sessions/start`,

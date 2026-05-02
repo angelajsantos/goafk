@@ -6,6 +6,12 @@ import Button from '../components/ui/Button'
 import { API_BASE_URL } from '../config/api'
 import { applyReminderPreset, REMINDER_PRESETS, resolveReminderPresetKey, syncReminderSettings } from '../utils/reminderPresets'
 import {
+  browserNotificationsSupported,
+  ensureBrowserNotificationPermission,
+  getBrowserNotificationPermission,
+} from '../utils/browserNotifications'
+import { playReminderChime, prepareReminderChime } from '../utils/reminderChime'
+import {
   WELLNESS_INTENSITIES,
   WELLNESS_REMINDER_TYPES,
   normalizeWellnessPreferences,
@@ -23,6 +29,7 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
   const [displayName, setDisplayName] = useState(storedUsername)
   const [profileNotice, setProfileNotice] = useState({ type: '', message: '' })
   const [passwordNotice, setPasswordNotice] = useState({ type: '', message: '' })
+  const [reminderNotice, setReminderNotice] = useState({ type: '', message: '' })
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -35,6 +42,7 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
   const wellnessPreferences = normalizeWellnessPreferences(settings)
   const activePreset = resolveReminderPresetKey(settings.reminderPreset)
   const activePresetDescription = REMINDER_PRESETS[activePreset]?.description || REMINDER_PRESETS.custom.description
+  const notificationPermission = getBrowserNotificationPermission()
 
   const updateBreakReminderSettings = (partialSettings) => {
     const nextSettings = syncReminderSettings(
@@ -50,6 +58,41 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
 
   const applyBreakPreset = (presetKey) => {
     setSettings(applyReminderPreset(presetKey, settings))
+  }
+
+  const toggleBrowserNotifications = async () => {
+    setReminderNotice({ type: '', message: '' })
+
+    if (settings.notifications && getBrowserNotificationPermission() === 'granted') {
+      setSettings({ ...settings, notifications: false })
+      return
+    }
+
+    if (!browserNotificationsSupported()) {
+      setSettings({ ...settings, notifications: false })
+      setReminderNotice({ type: 'error', message: 'Browser notifications are not supported here.' })
+      return
+    }
+
+    const permission = await ensureBrowserNotificationPermission()
+    if (permission === 'granted') {
+      setSettings({ ...settings, notifications: true })
+      setReminderNotice({ type: 'success', message: 'Browser notifications are ready for reminders.' })
+      return
+    }
+
+    setSettings({ ...settings, notifications: false })
+    setReminderNotice({ type: 'error', message: 'Notifications are blocked in this browser. You can allow them from site settings.' })
+  }
+
+  const toggleReminderSound = async () => {
+    const nextReminderSound = !settings.reminderSound
+    setSettings({ ...settings, reminderSound: nextReminderSound })
+
+    if (nextReminderSound) {
+      await prepareReminderChime()
+      playReminderChime()
+    }
   }
 
   const updateWellnessSettings = (partialSettings) => {
@@ -214,6 +257,38 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
         <div className="span-12">
           <Card title="Reminder Controls" subtitle={activePresetDescription}>
             <div className="account-stack">
+              {reminderNotice.message ? <p className={`notice notice--${reminderNotice.type || 'info'}`}>{reminderNotice.message}</p> : null}
+
+              <button
+                type="button"
+                className={`toggle ${settings.notifications && notificationPermission === 'granted' ? 'toggle--on' : ''}`}
+                onClick={toggleBrowserNotifications}
+              >
+                <div>
+                  <p className="settings-list__title">Browser notifications</p>
+                  <p className="settings-list__meta">Show break and wellness reminders even when this tab is not front and center.</p>
+                </div>
+                <span className="badge">
+                  {settings.notifications && notificationPermission === 'granted'
+                    ? 'On'
+                    : notificationPermission === 'default'
+                      ? 'Allow'
+                      : 'Off'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className={`toggle ${settings.reminderSound ? 'toggle--on' : ''}`}
+                onClick={toggleReminderSound}
+              >
+                <div>
+                  <p className="settings-list__title">Reminder chime</p>
+                  <p className="settings-list__meta">Play a soft three-note chime when break or wellness reminders appear.</p>
+                </div>
+                <span className="badge">{settings.reminderSound ? 'On' : 'Off'}</span>
+              </button>
+
               <div className="preset-grid">
                 {Object.entries(REMINDER_PRESETS).map(([key, preset]) => (
                   <button
