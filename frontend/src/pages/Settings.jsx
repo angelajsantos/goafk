@@ -20,6 +20,7 @@ import {
 const defaultAccount = {
   username: '',
   email: '',
+  steam: null,
 }
 
 export default function Settings({ setToken, settings, setSettings, onToggleAppearance }) {
@@ -30,6 +31,8 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
   const [profileNotice, setProfileNotice] = useState({ type: '', message: '' })
   const [passwordNotice, setPasswordNotice] = useState({ type: '', message: '' })
   const [reminderNotice, setReminderNotice] = useState({ type: '', message: '' })
+  const [steamNotice, setSteamNotice] = useState({ type: '', message: '' })
+  const [steamInput, setSteamInput] = useState('')
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -37,6 +40,7 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
   })
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
+  const [isConnectingSteam, setIsConnectingSteam] = useState(false)
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token])
   const wellnessPreferences = normalizeWellnessPreferences(settings)
@@ -205,6 +209,40 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
       })
     } finally {
       setIsSavingPassword(false)
+    }
+  }
+
+  const connectSteam = async (event) => {
+    event.preventDefault()
+
+    const nextSteamInput = steamInput.trim()
+    if (!nextSteamInput) {
+      setSteamNotice({ type: 'error', message: 'Enter your Steam profile URL or ID.' })
+      return
+    }
+
+    setIsConnectingSteam(true)
+    setSteamNotice({ type: '', message: '' })
+
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/steam/connect`,
+        { input: nextSteamInput },
+        { headers }
+      )
+      setAccount((current) => ({
+        ...current,
+        steam: res.data.steam,
+      }))
+      setSteamInput('')
+      setSteamNotice({ type: 'success', message: res.data.message || 'Steam account connected.' })
+    } catch (error) {
+      setSteamNotice({
+        type: 'error',
+        message: error.response?.data?.error || 'Unable to connect that Steam profile.',
+      })
+    } finally {
+      setIsConnectingSteam(false)
     }
   }
 
@@ -447,22 +485,56 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
         </div>
 
         <div className="span-6">
-          <Card title="Connected Accounts" subtitle="Space for future Steam and platform integrations">
-            <div className="settings-list">
-              <div className="settings-list__item">
-                <div>
-                  <p className="settings-list__title">Steam connection</p>
-                  <p className="settings-list__meta">Library sync and richer session naming can plug in here later.</p>
+          <Card title="Connected Accounts" subtitle="Verify the Steam profile attached to this account">
+            <div className="account-stack">
+              {steamNotice.message ? <p className={`notice notice--${steamNotice.type || 'info'}`}>{steamNotice.message}</p> : null}
+
+              <form className="steam-connect" onSubmit={connectSteam}>
+                <label className="field">
+                  <span className="field__label">Steam profile</span>
+                  <input
+                    className="input"
+                    value={steamInput}
+                    onChange={(event) => setSteamInput(event.target.value)}
+                    placeholder="Enter your Steam profile URL or ID"
+                    autoComplete="off"
+                  />
+                </label>
+
+                <div className="account-actions">
+                  <Button variant="primary" type="submit" disabled={isConnectingSteam || !steamInput.trim()}>
+                    {isConnectingSteam ? 'Connecting...' : 'Connect Steam'}
+                  </Button>
                 </div>
-                <span className="badge">Not connected</span>
-              </div>
-              <div className="settings-list__item">
-                <div>
-                  <p className="settings-list__title">Other launchers</p>
-                  <p className="settings-list__meta">Epic, Xbox, and Discord presence can follow the same pattern.</p>
+              </form>
+
+              {account.steam?.steamId ? (
+                <div className="steam-profile">
+                  {account.steam.avatar ? (
+                    <img className="steam-profile__avatar" src={account.steam.avatar} alt="" />
+                  ) : null}
+                  <div className="steam-profile__details">
+                    <div className="row">
+                      <p className="settings-list__title">{account.steam.personaname || 'Steam profile'}</p>
+                      <span className="badge">Connected</span>
+                    </div>
+                    <p className="settings-list__meta">{account.steam.steamId}</p>
+                    {account.steam.profileUrl ? (
+                      <a className="steam-profile__link" href={account.steam.profileUrl} target="_blank" rel="noreferrer">
+                        View Steam profile
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
-                <span className="badge badge--subtle">Future</span>
-              </div>
+              ) : (
+                <div className="settings-list__item">
+                  <div>
+                    <p className="settings-list__title">Steam connection</p>
+                    <p className="settings-list__meta">Not connected</p>
+                  </div>
+                  <span className="badge badge--subtle">Waiting</span>
+                </div>
+              )}
             </div>
           </Card>
         </div>

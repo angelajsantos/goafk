@@ -50,9 +50,11 @@ const PORT = process.env.PORT || 3001;
 
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/sessions');
+const steamRoutes = require('./routes/steam');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/steam', steamRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

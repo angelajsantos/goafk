@@ -91,6 +91,13 @@ const getUserPayload = (user) => ({
         loginAlerts: user.securityPreferences?.loginAlerts ?? true,
         sessionWarnings: user.securityPreferences?.sessionWarnings ?? true,
     },
+    steam: user.steam?.steamId ? {
+        steamId: user.steam.steamId,
+        personaname: user.steam.personaname,
+        avatar: user.steam.avatar,
+        profileUrl: user.steam.profileUrl,
+        connectedAt: user.steam.connectedAt,
+    } : null,
 });
 
 router.get('/public-stats', async (req, res) => {

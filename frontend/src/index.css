@@ -1520,6 +1520,47 @@ h4 {
   color: var(--ink-400);
 }
 
+.steam-connect {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.steam-profile {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(141, 180, 159, 0.5);
+  background: var(--muted-surface);
+}
+
+.steam-profile__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.steam-profile__details {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.steam-profile__link {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sage-strong);
+  text-decoration: none;
+}
+
+.steam-profile__link:hover {
+  text-decoration: underline;
+}
+
 .wellness-type-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1950,6 +1991,7 @@ h4 {
   .hero-actions,
   .reminder-callout,
   .session-record__toolbar,
+  .steam-profile .row,
   .row {
     flex-direction: column;
     align-items: flex-start;

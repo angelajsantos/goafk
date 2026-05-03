@@ -30,6 +30,13 @@ const userSchema = new mongoose.Schema({
         loginAlerts: { type: Boolean, default: true },
         sessionWarnings: { type: Boolean, default: true },
     },
+    steam: {
+        steamId: { type: String, trim: true },
+        personaname: { type: String, trim: true },
+        avatar: { type: String, trim: true },
+        profileUrl: { type: String, trim: true },
+        connectedAt: { type: Date },
+    },
 }, { timestamps: true });
 
 userSchema.pre('validate', function setUsernameKey() {
