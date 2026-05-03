@@ -17,7 +17,7 @@ export async function ensureBrowserNotificationPermission() {
   return window.Notification.permission
 }
 
-export function sendBrowserNotification({ title, body, tag }) {
+export function sendBrowserNotification({ title, body, tag, silent = true }) {
   if (!browserNotificationsSupported() || window.Notification.permission !== 'granted') {
     return null
   }
@@ -26,6 +26,7 @@ export function sendBrowserNotification({ title, body, tag }) {
     body,
     tag,
     icon: '/favicon.svg',
+    silent,
   })
 
   notification.onclick = () => {

@@ -63,6 +63,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   const token = localStorage.getItem('token')
   const username = localStorage.getItem('username')
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token])
+  const activeSessionId = activeSession?._id || null
 
   const completedTodaySeconds = sessions
     .filter((session) => session.endedAt && new Date(session.startedAt).toDateString() === new Date().toDateString())
@@ -102,11 +103,13 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   const notifyReminder = useCallback(
     (title, body, tag) => {
       if (!settings.notifications || notificationPermission !== 'granted') return
+      if (typeof document !== 'undefined' && !document.hidden) return
 
       sendBrowserNotification({
         title,
         body,
         tag,
+        silent: true,
       })
     },
     [notificationPermission, settings.notifications]
@@ -216,13 +219,13 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
   }, [settings.dailyPlaytimeLimit])
 
   useEffect(() => {
-    if (!activeSession) {
+    if (!activeSessionId) {
       setNextBreakReminderAt(breakReminderIntervalSeconds)
       return
     }
 
     setNextBreakReminderAt(elapsedRef.current + breakReminderIntervalSeconds)
-  }, [activeSession, breakReminderIntervalSeconds])
+  }, [activeSessionId, breakReminderIntervalSeconds])
 
   useEffect(() => {
     if (!activeSession || !wellnessPreferences.enabled) {

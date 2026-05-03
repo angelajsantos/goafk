@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Button from '../ui/Button'
 
+const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeWKGACTFyQrJc6puQwGM4XxJtchpgzWVTV5kAN-8cxkHEpeg/viewform?usp=dialog'
+
 export default function AppLayout({
   title,
   subtitle,
@@ -45,6 +47,14 @@ export default function AppLayout({
               </button>
             ) : null}
             {actions}
+            <a
+              className="feedback-link"
+              href={FEEDBACK_FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Give Feedback
+            </a>
             <Button variant="ghost" onClick={logout}>
               Logout
             </Button>
