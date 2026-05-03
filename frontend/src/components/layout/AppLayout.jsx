@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Button from '../ui/Button'
+import ThemeToggle from '../ui/ThemeToggle'
 
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeWKGACTFyQrJc6puQwGM4XxJtchpgzWVTV5kAN-8cxkHEpeg/viewform?usp=dialog'
 
@@ -33,19 +34,7 @@ export default function AppLayout({
             <p>{subtitle}</p>
           </div>
           <div className="topbar__actions">
-            {onToggleAppearance ? (
-              <button
-                type="button"
-                className="theme-toggle"
-                onClick={onToggleAppearance}
-                aria-label={`Switch to ${appearanceMode === 'light' ? 'dark' : 'light'} mode`}
-                title={`Switch to ${appearanceMode === 'light' ? 'dark' : 'light'} mode`}
-              >
-                <span className="theme-toggle__icon" aria-hidden="true">
-                  {appearanceMode === 'light' ? '\u2600' : '\u263E'}
-                </span>
-              </button>
-            ) : null}
+            <ThemeToggle appearanceMode={appearanceMode} onToggleAppearance={onToggleAppearance} />
             {actions}
             <a
               className="feedback-link"

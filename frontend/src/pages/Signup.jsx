@@ -3,6 +3,7 @@ import axios from 'axios'
 import { useNavigate, Link } from 'react-router-dom'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import ThemeToggle from '../components/ui/ThemeToggle'
 import { API_BASE_URL } from '../config/api'
 import { validateSignupForm } from '../utils/authValidation'
 
@@ -10,7 +11,7 @@ const wait = (milliseconds) => new Promise((resolve) => {
   window.setTimeout(resolve, milliseconds)
 })
 
-export default function Signup({ setToken }) {
+export default function Signup({ setToken, appearanceMode = 'dark', onToggleAppearance }) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -75,6 +76,14 @@ export default function Signup({ setToken }) {
 
   return (
     <div className="auth-page">
+      <header className="auth-nav" aria-label="Authentication navigation">
+        <Link className="landing-nav__brand" to="/">GoAFK</Link>
+        <div className="auth-nav__actions">
+          <Link className="ui-button ui-button--ghost ui-button--md" to="/">Back to intro</Link>
+          <ThemeToggle appearanceMode={appearanceMode} onToggleAppearance={onToggleAppearance} />
+        </div>
+      </header>
+
       <Card className="auth-card" title="Create account" subtitle="Start balancing game time and breaks with a calmer routine.">
         <form className="stack" onSubmit={handleSignup}>
           {status.message ? (

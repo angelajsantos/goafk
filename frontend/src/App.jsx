@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
@@ -13,6 +14,9 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'))
   const [settings, setSettings] = useState(loadSettings)
   const [games, setGames] = useState(loadGames)
+  const [resolvedAppearanceMode, setResolvedAppearanceMode] = useState(
+    settings.appearanceMode === 'system' ? 'dark' : (settings.appearanceMode || 'dark')
+  )
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: light)')
@@ -24,6 +28,7 @@ function App() {
           : (settings.appearanceMode || 'dark')
 
       document.documentElement.dataset.theme = resolvedTheme
+      setResolvedAppearanceMode(resolvedTheme)
     }
 
     applyTheme()
@@ -52,9 +57,36 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={token ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
-        <Route path="/login" element={<Login setToken={setToken} />} />
-        <Route path="/signup" element={<Signup setToken={setToken} />} />
+        <Route
+          path="/"
+          element={
+            <Landing
+              token={token}
+              appearanceMode={resolvedAppearanceMode}
+              onToggleAppearance={toggleAppearance}
+            />
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <Login
+              setToken={setToken}
+              appearanceMode={resolvedAppearanceMode}
+              onToggleAppearance={toggleAppearance}
+            />
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <Signup
+              setToken={setToken}
+              appearanceMode={resolvedAppearanceMode}
+              onToggleAppearance={toggleAppearance}
+            />
+          }
+        />
         <Route
           path="/dashboard"
           element={
