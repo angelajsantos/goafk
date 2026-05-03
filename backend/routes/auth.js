@@ -93,10 +93,11 @@ const getUserPayload = (user) => ({
     },
     steam: user.steam?.steamId ? {
         steamId: user.steam.steamId,
-        personaname: user.steam.personaname,
+        personaName: user.steam.personaName,
         avatar: user.steam.avatar,
         profileUrl: user.steam.profileUrl,
         connectedAt: user.steam.connectedAt,
+        verified: Boolean(user.steam.verified),
     } : null,
 });
 

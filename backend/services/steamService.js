@@ -1,5 +1,9 @@
 const PLAYER_SUMMARIES_URL = 'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/';
+const OWNED_GAMES_URL = 'https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/';
 const RESOLVE_VANITY_URL = 'https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/';
+const STEAM_OPENID_LOGIN_URL = 'https://steamcommunity.com/openid/login';
+const STEAM_OPENID_IDENTIFIER_SELECT = 'http://specs.openid.net/auth/2.0/identifier_select';
+const STEAM_OPENID_CLAIMED_ID_PATTERN = /^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/;
 const STEAM_ID_64_PATTERN = /^\d{17}$/;
 
 const createSteamError = (message, statusCode = 500) => {
@@ -36,6 +40,70 @@ const callSteamApi = async (url, action) => {
     } catch {
         throw createSteamError('Steam API returned an unreadable response.', 502);
     }
+};
+
+const getQueryValue = (query, key) => {
+    const value = query?.[key];
+    return Array.isArray(value) ? value[0] : value;
+};
+
+const buildSteamOpenIdUrl = ({ returnTo, realm }) => {
+    const url = new URL(STEAM_OPENID_LOGIN_URL);
+    url.searchParams.set('openid.ns', 'http://specs.openid.net/auth/2.0');
+    url.searchParams.set('openid.mode', 'checkid_setup');
+    url.searchParams.set('openid.return_to', returnTo);
+    url.searchParams.set('openid.realm', realm);
+    url.searchParams.set('openid.identity', STEAM_OPENID_IDENTIFIER_SELECT);
+    url.searchParams.set('openid.claimed_id', STEAM_OPENID_IDENTIFIER_SELECT);
+
+    return url.toString();
+};
+
+const verifySteamOpenIdResponse = async (query) => {
+    const mode = getQueryValue(query, 'openid.mode');
+    const claimedId = getQueryValue(query, 'openid.claimed_id');
+    const identity = getQueryValue(query, 'openid.identity');
+    const claimedIdMatch = claimedId?.match(STEAM_OPENID_CLAIMED_ID_PATTERN);
+
+    if (mode !== 'id_res') {
+        throw createSteamError('Steam OpenID response was not a successful sign-in assertion.', 400);
+    }
+
+    if (!claimedIdMatch || identity !== claimedId) {
+        throw createSteamError('Steam OpenID response did not include a valid SteamID.', 400);
+    }
+
+    const params = new URLSearchParams();
+    Object.keys(query || {})
+        .filter((key) => key.startsWith('openid.') && key !== 'openid.mode')
+        .forEach((key) => {
+            params.set(key, getQueryValue(query, key));
+        });
+    params.set('openid.mode', 'check_authentication');
+
+    let response;
+    try {
+        response = await fetch(STEAM_OPENID_LOGIN_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: params.toString(),
+        });
+    } catch {
+        throw createSteamError('Unable to verify Steam OpenID response.', 502);
+    }
+
+    if (!response.ok) {
+        throw createSteamError(`Steam OpenID verification failed with status ${response.status}.`, response.status);
+    }
+
+    const verificationText = await response.text();
+    if (!/^is_valid:true$/m.test(verificationText)) {
+        throw createSteamError('Steam OpenID verification was rejected.', 401);
+    }
+
+    return claimedIdMatch[1];
 };
 
 const parseSteamInput = (input) => {
@@ -121,8 +189,27 @@ const getPlayerSummaries = async (steamId64) => {
     return callSteamApi(url, 'fetching Steam profile');
 };
 
+const getOwnedGames = async (steamId64) => {
+    const apiKey = getSteamApiKey();
+
+    if (!steamId64) {
+        throw createSteamError('A SteamID64 is required.', 400);
+    }
+
+    const url = new URL(OWNED_GAMES_URL);
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('steamid', steamId64);
+    url.searchParams.set('include_appinfo', '1');
+    url.searchParams.set('include_played_free_games', '1');
+
+    return callSteamApi(url, 'fetching Steam games');
+};
+
 module.exports = {
+    buildSteamOpenIdUrl,
+    getOwnedGames,
     getPlayerSummaries,
     resolveSteamIdFromInput,
     resolveVanityUrl,
+    verifySteamOpenIdResponse,
 };

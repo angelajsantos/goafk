@@ -124,6 +124,7 @@ function App() {
                 setToken={setToken}
                 settings={settings}
                 setSettings={updateSettings}
+                setGames={updateGames}
                 onToggleAppearance={toggleAppearance}
               />
             ) : (

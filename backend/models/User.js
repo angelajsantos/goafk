@@ -32,12 +32,15 @@ const userSchema = new mongoose.Schema({
     },
     steam: {
         steamId: { type: String, trim: true },
-        personaname: { type: String, trim: true },
+        personaName: { type: String, trim: true },
         avatar: { type: String, trim: true },
         profileUrl: { type: String, trim: true },
         connectedAt: { type: Date },
+        verified: { type: Boolean, default: false },
     },
 }, { timestamps: true });
+
+userSchema.index({ 'steam.steamId': 1 }, { unique: true, sparse: true });
 
 userSchema.pre('validate', function setUsernameKey() {
     this.usernameKey = normalizeUsername(this.username);

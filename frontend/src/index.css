@@ -578,6 +578,18 @@ h4 {
   box-shadow: 0 10px 20px rgba(35, 16, 14, 0.32);
 }
 
+.ui-button--destructive-subtle {
+  border-color: rgba(188, 126, 117, 0.55);
+  color: #ffd9d3;
+}
+
+.ui-button--destructive-subtle:hover {
+  border-color: rgba(188, 126, 117, 0.78);
+  background:
+    linear-gradient(180deg, rgba(143, 90, 84, 0.28), rgba(122, 75, 70, 0.22)),
+    var(--secondary-button-hover-bg);
+}
+
 .ui-card {
   background: var(--card-bg);
   border: 1px solid var(--line);
@@ -1176,6 +1188,19 @@ h4 {
   font-family: var(--font-head);
 }
 
+.game-card__cover--steam {
+  background: linear-gradient(145deg, rgba(47, 75, 84, 0.9), rgba(26, 38, 45, 0.95));
+}
+
+.game-card__cover--steam img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(223, 188, 144, 0.24);
+  box-shadow: 0 10px 22px rgba(5, 10, 10, 0.28);
+}
+
 .game-card__content {
   padding: var(--space-4);
   display: grid;
@@ -1249,6 +1274,26 @@ h4 {
   border-radius: var(--radius-md);
   background: var(--muted-surface);
   padding: var(--space-5);
+}
+
+.empty-state--loading,
+.empty-state--action {
+  min-height: 220px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(141, 180, 159, 0.24);
+  border-top-color: var(--sage-strong);
+  border-radius: var(--pill);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .session-history {
@@ -1490,7 +1535,13 @@ h4 {
 
 .account-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   justify-content: flex-start;
+}
+
+.account-actions--inline {
+  margin-top: var(--space-2);
 }
 
 .settings-list {
@@ -1518,11 +1569,6 @@ h4 {
 .settings-list__meta {
   font-size: 13px;
   color: var(--ink-400);
-}
-
-.steam-connect {
-  display: grid;
-  gap: var(--space-3);
 }
 
 .steam-profile {

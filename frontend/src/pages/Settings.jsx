@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import AppLayout from '../components/layout/AppLayout'
 import Card from '../components/ui/Card'
@@ -23,7 +24,7 @@ const defaultAccount = {
   steam: null,
 }
 
-export default function Settings({ setToken, settings, setSettings, onToggleAppearance }) {
+export default function Settings({ setToken, settings, setSettings, setGames, onToggleAppearance }) {
   const token = localStorage.getItem('token')
   const storedUsername = localStorage.getItem('username') || 'Player'
   const [account, setAccount] = useState(defaultAccount)
@@ -32,7 +33,6 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
   const [passwordNotice, setPasswordNotice] = useState({ type: '', message: '' })
   const [reminderNotice, setReminderNotice] = useState({ type: '', message: '' })
   const [steamNotice, setSteamNotice] = useState({ type: '', message: '' })
-  const [steamInput, setSteamInput] = useState('')
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -41,6 +41,8 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingPassword, setIsSavingPassword] = useState(false)
   const [isConnectingSteam, setIsConnectingSteam] = useState(false)
+  const [isDisconnectingSteam, setIsDisconnectingSteam] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token])
   const wellnessPreferences = normalizeWellnessPreferences(settings)
@@ -139,6 +141,28 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
     fetchAccount()
   }, [headers, storedUsername])
 
+  useEffect(() => {
+    const steamStatus = searchParams.get('steam')
+    const steamError = searchParams.get('steam_error')
+
+    if (!steamStatus && !steamError) {
+      return
+    }
+
+    if (steamStatus === 'connected') {
+      setSteamNotice({ type: 'success', message: 'Steam account connected.' })
+    }
+
+    if (steamError) {
+      setSteamNotice({ type: 'error', message: steamError })
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.delete('steam')
+    nextSearchParams.delete('steam_error')
+    setSearchParams(nextSearchParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
   const toggleAppearance = () => {
     setSettings({
       ...settings,
@@ -212,37 +236,44 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
     }
   }
 
-  const connectSteam = async (event) => {
-    event.preventDefault()
-
-    const nextSteamInput = steamInput.trim()
-    if (!nextSteamInput) {
-      setSteamNotice({ type: 'error', message: 'Enter your Steam profile URL or ID.' })
-      return
-    }
-
+  const startSteamAuth = async () => {
     setIsConnectingSteam(true)
     setSteamNotice({ type: '', message: '' })
 
     try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/steam/connect`,
-        { input: nextSteamInput },
-        { headers }
-      )
-      setAccount((current) => ({
-        ...current,
-        steam: res.data.steam,
-      }))
-      setSteamInput('')
-      setSteamNotice({ type: 'success', message: res.data.message || 'Steam account connected.' })
+      const res = await axios.get(`${API_BASE_URL}/api/steam/auth/state`, { headers })
+      window.location.assign(res.data.authUrl)
     } catch (error) {
       setSteamNotice({
         type: 'error',
-        message: error.response?.data?.error || 'Unable to connect that Steam profile.',
+        message: error.response?.data?.error || 'Unable to start Steam sign in.',
+      })
+      setIsConnectingSteam(false)
+    }
+  }
+
+  const disconnectSteam = async () => {
+    const confirmed = window.confirm('Disconnect Steam? Imported Steam games may be removed.')
+    if (!confirmed) return
+
+    setIsDisconnectingSteam(true)
+    setSteamNotice({ type: '', message: '' })
+
+    try {
+      const res = await axios.delete(`${API_BASE_URL}/api/steam/disconnect`, { headers })
+      setAccount((current) => ({
+        ...current,
+        steam: null,
+      }))
+      setGames?.([])
+      setSteamNotice({ type: 'success', message: res.data.message || 'Steam account disconnected.' })
+    } catch (error) {
+      setSteamNotice({
+        type: 'error',
+        message: error.response?.data?.error || 'Unable to disconnect Steam account.',
       })
     } finally {
-      setIsConnectingSteam(false)
+      setIsDisconnectingSteam(false)
     }
   }
 
@@ -489,24 +520,13 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
             <div className="account-stack">
               {steamNotice.message ? <p className={`notice notice--${steamNotice.type || 'info'}`}>{steamNotice.message}</p> : null}
 
-              <form className="steam-connect" onSubmit={connectSteam}>
-                <label className="field">
-                  <span className="field__label">Steam profile</span>
-                  <input
-                    className="input"
-                    value={steamInput}
-                    onChange={(event) => setSteamInput(event.target.value)}
-                    placeholder="Enter your Steam profile URL or ID"
-                    autoComplete="off"
-                  />
-                </label>
-
+              {!account.steam?.steamId ? (
                 <div className="account-actions">
-                  <Button variant="primary" type="submit" disabled={isConnectingSteam || !steamInput.trim()}>
-                    {isConnectingSteam ? 'Connecting...' : 'Connect Steam'}
+                  <Button variant="primary" onClick={startSteamAuth} disabled={isConnectingSteam}>
+                    {isConnectingSteam ? 'Opening Steam...' : 'Sign in with Steam'}
                   </Button>
                 </div>
-              </form>
+              ) : null}
 
               {account.steam?.steamId ? (
                 <div className="steam-profile">
@@ -515,8 +535,8 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
                   ) : null}
                   <div className="steam-profile__details">
                     <div className="row">
-                      <p className="settings-list__title">{account.steam.personaname || 'Steam profile'}</p>
-                      <span className="badge">Connected</span>
+                      <p className="settings-list__title">{account.steam.personaName || 'Steam profile'}</p>
+                      <span className="badge">{account.steam.verified ? 'Verified' : 'Connected'}</span>
                     </div>
                     <p className="settings-list__meta">{account.steam.steamId}</p>
                     {account.steam.profileUrl ? (
@@ -524,6 +544,16 @@ export default function Settings({ setToken, settings, setSettings, onToggleAppe
                         View Steam profile
                       </a>
                     ) : null}
+                    <div className="account-actions account-actions--inline">
+                      <Button
+                        variant="secondary"
+                        className="ui-button--destructive-subtle"
+                        onClick={disconnectSteam}
+                        disabled={isDisconnectingSteam}
+                      >
+                        {isDisconnectingSteam ? 'Disconnecting...' : 'Disconnect Steam'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ) : (
