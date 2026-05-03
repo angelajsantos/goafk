@@ -83,6 +83,12 @@
   --danger-button-bg: linear-gradient(180deg, #8f5a54, #7a4b46);
   --danger-button-hover-bg: linear-gradient(180deg, #a16861, #85534d);
   --danger-button-border: #9c6963;
+  --destructive-subtle-color: #ffd9d3;
+  --destructive-subtle-border: rgba(188, 126, 117, 0.55);
+  --destructive-subtle-hover-border: rgba(188, 126, 117, 0.78);
+  --destructive-subtle-hover-bg:
+    linear-gradient(180deg, rgba(143, 90, 84, 0.28), rgba(122, 75, 70, 0.22)),
+    var(--secondary-button-hover-bg);
   --muted-surface: rgba(18, 29, 28, 0.42);
   --recent-item-bg: linear-gradient(160deg, #253836, #1f302f);
   --game-card-bg: linear-gradient(180deg, rgba(35, 50, 48, 0.96), rgba(23, 35, 33, 0.98));
@@ -216,6 +222,12 @@
   --danger-button-bg: linear-gradient(180deg, #b97c73, #a3645c);
   --danger-button-hover-bg: linear-gradient(180deg, #c5877f, #ad6d65);
   --danger-button-border: #b57b73;
+  --destructive-subtle-color: #8e3f36;
+  --destructive-subtle-border: rgba(177, 89, 79, 0.5);
+  --destructive-subtle-hover-border: rgba(161, 74, 65, 0.72);
+  --destructive-subtle-hover-bg:
+    linear-gradient(180deg, rgba(185, 111, 101, 0.18), rgba(163, 91, 82, 0.12)),
+    var(--secondary-button-hover-bg);
   --muted-surface: rgba(244, 249, 245, 0.88);
   --recent-item-bg: linear-gradient(160deg, #f5faf7, #e9f1ec);
   --game-card-bg: linear-gradient(180deg, rgba(252, 255, 253, 0.98), rgba(238, 245, 240, 0.99));
@@ -607,15 +619,13 @@ h4 {
 }
 
 .ui-button--destructive-subtle {
-  border-color: rgba(188, 126, 117, 0.55);
-  color: #ffd9d3;
+  border-color: var(--destructive-subtle-border);
+  color: var(--destructive-subtle-color);
 }
 
 .ui-button--destructive-subtle:hover {
-  border-color: rgba(188, 126, 117, 0.78);
-  background:
-    linear-gradient(180deg, rgba(143, 90, 84, 0.28), rgba(122, 75, 70, 0.22)),
-    var(--secondary-button-hover-bg);
+  border-color: var(--destructive-subtle-hover-border);
+  background: var(--destructive-subtle-hover-bg);
 }
 
 .ui-card {
