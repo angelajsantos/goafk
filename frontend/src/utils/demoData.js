@@ -1,15 +1,23 @@
+import {
+  DEFAULT_BREAK_REMINDER_INTERVAL_MINUTES,
+  DEFAULT_PREFERRED_BREAK_DURATION_MINUTES,
+  DEFAULT_REMINDER_PRESET,
+  REMINDER_PRESETS,
+  normalizeReminderSettings,
+} from './reminderPresets'
+
 export const defaultSettings = {
   appearanceMode: 'dark',
-  breakReminderIntervalMinutes: 30,
+  breakReminderIntervalMinutes: DEFAULT_BREAK_REMINDER_INTERVAL_MINUTES,
   dailyPlaytimeLimit: 120,
   reminderSound: true,
   notifications: true,
   darkCozyTheme: true,
   sessionAutoPauseReminder: true,
-  preferredBreakDuration: 5,
-  reminderPreset: 'support',
-  reminderMode: 'balanced',
-  gentleReminderMode: true,
+  preferredBreakDuration: DEFAULT_PREFERRED_BREAK_DURATION_MINUTES,
+  reminderPreset: DEFAULT_REMINDER_PRESET,
+  reminderMode: REMINDER_PRESETS[DEFAULT_REMINDER_PRESET].reminderMode,
+  gentleReminderMode: REMINDER_PRESETS[DEFAULT_REMINDER_PRESET].reminderMode === 'gentle',
   focusMode: false,
   wellnessRemindersEnabled: true,
   wellnessIntensity: 'balanced',
@@ -60,10 +68,10 @@ export function loadSettings() {
 
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY)
-    if (!raw) return defaultSettings
-    return { ...defaultSettings, ...JSON.parse(raw) }
+    if (!raw) return normalizeReminderSettings(defaultSettings)
+    return normalizeReminderSettings({ ...defaultSettings, ...JSON.parse(raw) })
   } catch {
-    return defaultSettings
+    return normalizeReminderSettings(defaultSettings)
   }
 }
 

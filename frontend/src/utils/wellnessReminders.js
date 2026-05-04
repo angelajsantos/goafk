@@ -16,8 +16,8 @@ export const WELLNESS_REMINDER_TYPES = {
     skipLabel: 'Skip',
   },
   walk: {
-    label: 'Two-minute walk and stretch break',
-    statLabel: 'Walk and stretch reminders',
+    label: 'Two-minute walk',
+    statLabel: 'Walk reminders',
     title: 'Two-minute walk and stretch',
     message: 'A short lap, water refill, or doorway stretch can help the next match feel better.',
     doneLabel: 'Done',

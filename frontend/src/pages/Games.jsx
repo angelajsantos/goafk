@@ -190,6 +190,10 @@ export default function Games({ setToken, games, setGames, appearanceMode, onTog
     }
   }
 
+  const goToManualSession = () => {
+    navigate('/dashboard')
+  }
+
   const startSteamAuth = async () => {
     setIsStartingSteamAuth(true)
     setNotice({ type: '', message: '' })
@@ -371,7 +375,7 @@ export default function Games({ setToken, games, setGames, appearanceMode, onTog
 
       <AppLayout
         title="Games"
-        subtitle="Browse your verified Steam library and start tracking sessions from the games you actually play."
+        subtitle="Manual sessions work without Steam. Connect Steam only when you want library import."
         username={username}
         setToken={setToken}
         appearanceMode={appearanceMode}
@@ -379,6 +383,9 @@ export default function Games({ setToken, games, setGames, appearanceMode, onTog
         actions={
           steamConnected ? (
             <>
+              <Button variant="secondary" onClick={goToManualSession}>
+                Start Manual Session
+              </Button>
               <Button variant="primary" onClick={importSteamLibrary} disabled={isImportingGames || isDisconnectingSteam}>
                 {isImportingGames ? 'Refreshing...' : importedGames.length ? 'Refresh Steam Library' : 'Import Steam Library'}
               </Button>
@@ -392,9 +399,14 @@ export default function Games({ setToken, games, setGames, appearanceMode, onTog
               </Button>
             </>
           ) : (
-            <Button variant="primary" onClick={startSteamAuth} disabled={isStartingSteamAuth || isLoadingAccount}>
-              {isStartingSteamAuth ? 'Opening Steam...' : 'Sign in with Steam'}
-            </Button>
+            <>
+              <Button variant="secondary" onClick={goToManualSession}>
+                Start Manual Session
+              </Button>
+              <Button variant="primary" onClick={startSteamAuth} disabled={isStartingSteamAuth || isLoadingAccount}>
+                {isStartingSteamAuth ? 'Opening Steam...' : 'Sign in with Steam'}
+              </Button>
+            </>
           )
         }
       >
@@ -405,7 +417,7 @@ export default function Games({ setToken, games, setGames, appearanceMode, onTog
               subtitle={
                 steamConnected
                   ? `${account.steam.personaName || 'Steam'} is connected${lastImportedAt ? ` - last refreshed ${formatImportedTime(lastImportedAt)}` : ''}.`
-                  : 'Connect Steam to import your owned games.'
+                  : 'Steam is optional here and only needed to import your owned games.'
               }
             >
               <div className="account-stack">
@@ -419,10 +431,15 @@ export default function Games({ setToken, games, setGames, appearanceMode, onTog
                 ) : !steamConnected ? (
                   <div className="empty-state empty-state--action">
                     <div className="stack center">
-                      <p>Connect your Steam account to import your games.</p>
-                      <Button variant="primary" onClick={startSteamAuth} disabled={isStartingSteamAuth}>
-                        {isStartingSteamAuth ? 'Opening Steam...' : 'Sign in with Steam'}
-                      </Button>
+                      <p>Start a manual session from the dashboard, or connect Steam to import your game library.</p>
+                      <div className="account-actions account-actions--center">
+                        <Button variant="secondary" onClick={goToManualSession}>
+                          Start Manual Session
+                        </Button>
+                        <Button variant="primary" onClick={startSteamAuth} disabled={isStartingSteamAuth}>
+                          {isStartingSteamAuth ? 'Opening Steam...' : 'Sign in with Steam'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : isImportingGames ? (

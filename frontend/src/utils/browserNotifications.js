@@ -25,7 +25,7 @@ export function sendBrowserNotification({ title, body, tag, silent = true }) {
   const notification = new window.Notification(title, {
     body,
     tag,
-    icon: '/favicon.svg',
+    icon: '/assets/darkicon-wobg.png',
     silent,
   })
 

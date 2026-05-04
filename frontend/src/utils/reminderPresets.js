@@ -1,7 +1,7 @@
 export const REMINDER_PRESETS = {
   tank: {
     label: 'Tank',
-    subtitle: 'Marathon Play',
+    subtitle: 'Long Sessions',
     intervalMinutes: 60,
     breakDurationMinutes: 12,
     reminderMode: 'gentle',
@@ -9,7 +9,7 @@ export const REMINDER_PRESETS = {
   },
   dps: {
     label: 'DPS',
-    subtitle: 'High Intensity',
+    subtitle: 'Focused',
     intervalMinutes: 35,
     breakDurationMinutes: 5,
     reminderMode: 'focus',
@@ -17,15 +17,15 @@ export const REMINDER_PRESETS = {
   },
   support: {
     label: 'Support',
-    subtitle: 'Sustain Play',
-    intervalMinutes: 45,
-    breakDurationMinutes: 8,
+    subtitle: 'Balanced',
+    intervalMinutes: 30,
+    breakDurationMinutes: 5,
     reminderMode: 'balanced',
-    description: 'Steady pacing for longer sessions without wearing down.',
+    description: 'A steady default: a break check-in every 30 minutes with a 5-minute reset.',
   },
   captain: {
     label: 'Captain',
-    subtitle: 'Strategic Pace',
+    subtitle: 'Relaxed',
     intervalMinutes: 55,
     breakDurationMinutes: 10,
     reminderMode: 'gentle',
@@ -43,6 +43,10 @@ const REMINDER_PRESET_ALIASES = {
   focused: 'dps',
   balanced: 'support',
 }
+
+export const DEFAULT_REMINDER_PRESET = 'support'
+export const DEFAULT_BREAK_REMINDER_INTERVAL_MINUTES = REMINDER_PRESETS[DEFAULT_REMINDER_PRESET].intervalMinutes
+export const DEFAULT_PREFERRED_BREAK_DURATION_MINUTES = REMINDER_PRESETS[DEFAULT_REMINDER_PRESET].breakDurationMinutes
 
 export function resolveReminderPresetKey(presetKey = '') {
   if (REMINDER_PRESETS[presetKey]) return presetKey
@@ -82,4 +86,42 @@ export function syncReminderSettings(partialSettings, previousSettings) {
     gentleReminderMode: nextSettings.reminderMode === 'gentle',
     focusMode: nextSettings.reminderMode === 'focus',
   }
+}
+
+export function normalizeReminderSettings(settings = {}) {
+  const resolvedPresetKey = resolveReminderPresetKey(settings.reminderPreset || DEFAULT_REMINDER_PRESET)
+  const preset = REMINDER_PRESETS[resolvedPresetKey]
+
+  if (preset && resolvedPresetKey !== 'custom') {
+    return syncReminderSettings(
+      {
+        ...settings,
+        breakReminderIntervalMinutes: preset.intervalMinutes,
+        preferredBreakDuration: preset.breakDurationMinutes,
+        reminderMode: preset.reminderMode,
+        reminderPreset: resolvedPresetKey,
+      },
+      settings
+    )
+  }
+
+  const intervalMinutes = Math.max(
+    0.1,
+    Number(settings.breakReminderIntervalMinutes) || DEFAULT_BREAK_REMINDER_INTERVAL_MINUTES
+  )
+  const breakDurationMinutes = Math.max(
+    1,
+    Number(settings.preferredBreakDuration) || DEFAULT_PREFERRED_BREAK_DURATION_MINUTES
+  )
+
+  return syncReminderSettings(
+    {
+      ...settings,
+      breakReminderIntervalMinutes: intervalMinutes,
+      preferredBreakDuration: breakDurationMinutes,
+      reminderMode: settings.reminderMode || REMINDER_PRESETS[DEFAULT_REMINDER_PRESET].reminderMode,
+      reminderPreset: 'custom',
+    },
+    settings
+  )
 }

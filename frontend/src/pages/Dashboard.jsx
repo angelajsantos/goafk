@@ -745,7 +745,7 @@ export default function Dashboard({ setToken, settings, setSettings, onToggleApp
                 subtitle={
                   activeSession
                     ? `Now playing: ${activeSession.gameName}`
-                    : `Ready to begin? Break reminders every ${settings.breakReminderIntervalMinutes} minutes.`
+                    : `Ready to begin? No Steam connection needed. Break reminders every ${settings.breakReminderIntervalMinutes} minutes.`
                 }
               >
                 <div className="stack">
